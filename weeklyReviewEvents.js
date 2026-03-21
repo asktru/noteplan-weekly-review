@@ -20,19 +20,23 @@ function tomorrowStr() {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
-function thisWeekStr() {
-  var d = new Date();
-  var onejan = new Date(d.getFullYear(), 0, 1);
-  var weekNum = Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7);
+function isoWeekStr(date) {
+  var d = new Date(date.getTime());
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  var week1 = new Date(d.getFullYear(), 0, 4);
+  var weekNum = 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
   return d.getFullYear() + '-W' + String(weekNum).padStart(2, '0');
+}
+
+function thisWeekStr() {
+  return isoWeekStr(new Date());
 }
 
 function nextWeekStr() {
   var d = new Date();
   d.setDate(d.getDate() + 7);
-  var onejan = new Date(d.getFullYear(), 0, 1);
-  var weekNum = Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7);
-  return d.getFullYear() + '-W' + String(weekNum).padStart(2, '0');
+  return isoWeekStr(d);
 }
 
 function formatDateShort(dateStr) {
