@@ -320,6 +320,23 @@ function renderMarkdown(str) {
 /**
  * Generate theme CSS from NotePlan
  */
+function isLightTheme() {
+  try {
+    const theme = Editor.currentTheme;
+    if (!theme) return false;
+    if (theme.style === 'Light') return true;
+    if (theme.base && theme.base.backgroundColor) {
+      const bg = theme.base.backgroundColor;
+      const m = bg.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
+      if (m) {
+        const lum = (parseInt(m[1], 16) * 299 + parseInt(m[2], 16) * 587 + parseInt(m[3], 16) * 114) / 1000;
+        return lum > 140;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
 function getThemeCSS() {
   try {
     const theme = Editor.currentTheme;
@@ -638,6 +655,20 @@ function getInlineCSS() {
   --wr-radius-xs: 4px;
   --wr-gap: 10px;
   --wr-pad: 14px;
+}
+/* ---- Light theme overrides ---- */
+[data-theme="light"] {
+  --wr-bg-elevated: color-mix(in srgb, var(--wr-bg-card) 92%, black 8%);
+  --wr-text-muted: color-mix(in srgb, var(--wr-text) 60%, transparent);
+  --wr-text-faint: color-mix(in srgb, var(--wr-text) 40%, transparent);
+  --wr-border: color-mix(in srgb, var(--wr-text) 12%, transparent);
+  --wr-border-strong: color-mix(in srgb, var(--wr-text) 22%, transparent);
+  --wr-green-soft: color-mix(in srgb, #10B981 10%, white);
+  --wr-yellow-soft: color-mix(in srgb, #F59E0B 10%, white);
+  --wr-red-soft: color-mix(in srgb, #EF4444 10%, white);
+  --wr-blue-soft: color-mix(in srgb, #3B82F6 10%, white);
+  --wr-purple-soft: color-mix(in srgb, #8B5CF6 10%, white);
+  --wr-accent-soft: color-mix(in srgb, var(--wr-accent) 12%, white);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -969,8 +1000,9 @@ function buildFullHTML(bodyContent) {
     <link href="../np.Shared/solid.min.flat4NP.css" rel="stylesheet">
   `;
 
+  const themeAttr = isLightTheme() ? 'light' : 'dark';
   return `<!DOCTYPE html>
-<html>
+<html data-theme="${themeAttr}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, viewport-fit=cover">
