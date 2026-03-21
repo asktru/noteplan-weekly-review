@@ -514,7 +514,6 @@ function buildHeader(projects) {
       <span class="wr-header-stat"><span class="wr-header-stat-value due">${due}</span> review soon</span>
     </div>
     <div class="wr-header-actions">
-      <button class="wr-btn" data-action="refreshDashboard"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
     </div>
   </div>`;
 }
@@ -777,7 +776,7 @@ body {
 .wr-empty-desc { font-size: 12px; color: var(--wr-text-muted); }
 [data-tooltip] { position: relative; }
 [data-tooltip]:hover::after {
-  content: attr(data-tooltip); position: absolute; bottom: calc(100% + 6px); right: 0;
+  content: attr(data-tooltip); position: absolute; top: calc(100% + 6px); right: 0;
   padding: 4px 8px; font-size: 11px; font-weight: 500;
   white-space: nowrap; background: var(--wr-bg-elevated); color: var(--wr-text);
   border: 1px solid var(--wr-border-strong); border-radius: var(--wr-radius-xs);
