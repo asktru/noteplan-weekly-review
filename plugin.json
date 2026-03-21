@@ -1,0 +1,101 @@
+{
+  "macOS.minVersion": "10.13.0",
+  "noteplan.minAppVersion": "3.9.0",
+  "plugin.id": "asktru.WeeklyReview",
+  "plugin.name": "Weekly Review Dashboard",
+  "plugin.description": "A beautiful dashboard for reviewing your projects and areas on a schedule.",
+  "plugin.icon": "🔄",
+  "plugin.author": "asktru",
+  "plugin.version": "1.0.0",
+  "plugin.lastUpdateInfo": "Initial release",
+  "plugin.script": "script.js",
+  "plugin.isRemote": "false",
+  "plugin.dependsOn": [
+    {
+      "id": "np.Shared",
+      "minVersion": "1.0.0"
+    }
+  ],
+  "plugin.requiredFiles": [
+    "weeklyReview.css",
+    "weeklyReviewEvents.js"
+  ],
+  "plugin.requiredSharedFiles": [
+    "fontawesome.css",
+    "regular.min.flat4NP.css",
+    "solid.min.flat4NP.css",
+    "fa-regular-400.woff2",
+    "fa-solid-900.woff2",
+    "pluginToHTMLCommsBridge.js"
+  ],
+  "plugin.settings": [
+    {
+      "type": "heading",
+      "title": "Weekly Review Settings"
+    },
+    {
+      "key": "projectTypeTags",
+      "title": "Project/Area Tags",
+      "description": "Comma-separated list of tags to identify projects and areas.",
+      "type": "string",
+      "default": "#project, #area",
+      "required": true
+    },
+    {
+      "key": "foldersToExclude",
+      "title": "Folders to Exclude",
+      "description": "Comma-separated list of folder names to exclude from scanning.",
+      "type": "string",
+      "default": "@Archive, @Trash, @Templates, Memo, Meetings",
+      "required": false
+    },
+    {
+      "key": "reviewMentionStr",
+      "title": "Review Mention",
+      "description": "The mention string used for review interval.",
+      "type": "string",
+      "default": "@review",
+      "required": true
+    },
+    {
+      "key": "reviewedMentionStr",
+      "title": "Reviewed Mention",
+      "description": "The mention string used for last reviewed date.",
+      "type": "string",
+      "default": "@reviewed",
+      "required": true
+    }
+  ],
+  "plugin.commands": [
+    {
+      "name": "Weekly Review Dashboard",
+      "alias": ["wrd", "weekly review"],
+      "description": "Open the Weekly Review Dashboard",
+      "jsFunction": "showWeeklyReviewDashboard",
+      "sidebarView": {
+        "windowID": "asktru.WeeklyReview.dashboard",
+        "title": "Weekly Review",
+        "icon": "list-check",
+        "iconColor": "#7C3AED"
+      }
+    },
+    {
+      "name": "onMessageFromHTMLView",
+      "description": "Callback for HTML window messages",
+      "jsFunction": "onMessageFromHTMLView",
+      "hidden": true
+    },
+    {
+      "name": "Mark as Reviewed",
+      "alias": ["review done"],
+      "description": "Mark the current note as reviewed today",
+      "jsFunction": "markCurrentNoteReviewed"
+    },
+    {
+      "name": "Refresh Review Dashboard",
+      "description": "Refresh the review dashboard data",
+      "jsFunction": "refreshDashboard",
+      "hidden": true
+    }
+  ]
+}
