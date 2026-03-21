@@ -320,13 +320,26 @@ function renderMarkdown(str) {
 /**
  * Generate theme CSS from NotePlan
  */
+/**
+ * Convert NotePlan's #AARRGGBB hex to standard #RRGGBBAA (or pass through #RRGGBB)
+ */
+function npColor(c) {
+  if (!c) return null;
+  if (c.match && c.match(/^#[0-9A-Fa-f]{8}$/)) {
+    return '#' + c.slice(3, 9) + c.slice(1, 3);
+  }
+  return c;
+}
+
 function isLightTheme() {
   try {
     const theme = Editor.currentTheme;
     if (!theme) return false;
-    if (theme.style === 'Light') return true;
-    if (theme.base && theme.base.backgroundColor) {
-      const bg = theme.base.backgroundColor;
+    if (theme.mode === 'light') return true;
+    if (theme.mode === 'dark') return false;
+    const vals = theme.values || {};
+    const bg = npColor((vals.editor || {}).backgroundColor);
+    if (bg) {
       const m = bg.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
       if (m) {
         const lum = (parseInt(m[1], 16) * 299 + parseInt(m[2], 16) * 587 + parseInt(m[3], 16) * 114) / 1000;
@@ -341,19 +354,17 @@ function getThemeCSS() {
   try {
     const theme = Editor.currentTheme;
     if (!theme) return '';
+    const vals = theme.values || {};
+    const editor = vals.editor || {};
     const styles = [];
-    if (theme.base && theme.base.backgroundColor) {
-      styles.push(`--bg-main-color: ${theme.base.backgroundColor}`);
-    }
-    if (theme.base && theme.base.altBackgroundColor) {
-      styles.push(`--bg-alt-color: ${theme.base.altBackgroundColor}`);
-    }
-    if (theme.base && theme.base.textColor) {
-      styles.push(`--fg-main-color: ${theme.base.textColor}`);
-    }
-    if (theme.base && theme.base.tintColor) {
-      styles.push(`--tint-color: ${theme.base.tintColor}`);
-    }
+    const bg = npColor(editor.backgroundColor);
+    const altBg = npColor(editor.altBackgroundColor);
+    const text = npColor(editor.textColor);
+    const tint = npColor(editor.tintColor);
+    if (bg) styles.push('--bg-main-color: ' + bg);
+    if (altBg) styles.push('--bg-alt-color: ' + altBg);
+    if (text) styles.push('--fg-main-color: ' + text);
+    if (tint) styles.push('--tint-color: ' + tint);
     if (styles.length > 0) {
       return `:root { ${styles.join('; ')}; }`;
     }
