@@ -303,6 +303,12 @@ function esc(str) {
 function renderMarkdown(str) {
   if (!str) return '';
   var s = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // Wiki links: [[Note Name]]
+  s = s.replace(/\[\[([^\]]+)\]\]/g, function(match, noteName) {
+    var encoded = encodeURIComponent(noteName.replace(/\.md$/, '') + '.md');
+    var url = 'noteplan://x-callback-url/openNote?filename=' + encoded + '&amp;reuseSplitView=yes&amp;splitView=yes';
+    return '<a class="wr-md-link" href="' + url + '" title="' + noteName.replace(/"/g, '&quot;') + '">&#x1F517; ' + noteName + '</a>';
+  });
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a class="wr-md-link" href="$2" title="$2">$1</a>');
   s = s.replace(/`([^`]+)`/g, '<code class="wr-md-code">$1</code>');
   s = s.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
