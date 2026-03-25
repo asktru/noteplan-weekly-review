@@ -667,9 +667,9 @@ function getThemePriorityColors() {
     var styles = Editor.currentTheme.values.styles || {};
     var f1 = styles['flagged-1'], f2 = styles['flagged-2'], f3 = styles['flagged-3'];
     return {
-      pri3: { bg: (f1 && f1.backgroundColor) ? npColorToCSS(f1.backgroundColor) || defaults.pri3.bg : defaults.pri3.bg, color: (f1 && f1.color) ? npColorToCSS(f1.color) || defaults.pri3.color : defaults.pri3.color },
+      pri1: { bg: (f1 && f1.backgroundColor) ? npColorToCSS(f1.backgroundColor) || defaults.pri1.bg : defaults.pri1.bg, color: (f1 && f1.color) ? npColorToCSS(f1.color) || defaults.pri1.color : defaults.pri1.color },
       pri2: { bg: (f2 && f2.backgroundColor) ? npColorToCSS(f2.backgroundColor) || defaults.pri2.bg : defaults.pri2.bg, color: (f2 && f2.color) ? npColorToCSS(f2.color) || defaults.pri2.color : defaults.pri2.color },
-      pri1: { bg: (f3 && f3.backgroundColor) ? npColorToCSS(f3.backgroundColor) || defaults.pri1.bg : defaults.pri1.bg, color: (f3 && f3.color) ? npColorToCSS(f3.color) || defaults.pri1.color : defaults.pri1.color },
+      pri3: { bg: (f3 && f3.backgroundColor) ? npColorToCSS(f3.backgroundColor) || defaults.pri3.bg : defaults.pri3.bg, color: (f3 && f3.color) ? npColorToCSS(f3.color) || defaults.pri3.color : defaults.pri3.color },
     };
   } catch (e) { return defaults; }
 }
@@ -958,7 +958,7 @@ body {
   font-size: 9px; font-weight: 800; flex-shrink: 0; cursor: pointer;
   margin-top: 2px; transition: all 0.15s ease;
 }
-' + priCSS('wr-task-pri') + '
+${priCSS('wr-task-pri')}
 
 /* Task schedule badge */
 .wr-task-sched {
