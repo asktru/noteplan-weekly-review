@@ -919,9 +919,9 @@ body {
   font-size: 9px; font-weight: 800; flex-shrink: 0; cursor: pointer;
   margin-top: 2px; transition: all 0.15s ease;
 }
-.wr-task-pri.p1 { background: var(--wr-yellow-soft); color: var(--wr-yellow); }
-.wr-task-pri.p2 { background: color-mix(in srgb, #F97316 12%, transparent); color: #F97316; }
-.wr-task-pri.p3 { background: var(--wr-red-soft); color: var(--wr-red); }
+.wr-task-pri.p3 { background: rgba(255,85,85,0.27); color: #FFB5B5; }
+.wr-task-pri.p2 { background: rgba(255,85,85,0.47); color: #FFCCCC; }
+.wr-task-pri.p1 { background: rgba(255,85,85,0.67); color: #FFDBBE; }
 
 /* Task schedule badge */
 .wr-task-sched {
