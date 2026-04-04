@@ -1500,6 +1500,11 @@ async function onMessageFromHTMLView(actionType, data) {
 
       case 'toggleTaskComplete': {
         const filename = decSafe(parsedData.encodedFilename);
+        // Check for @repeat before toggling (content may change after)
+        const tcNote = DataStore.projectNoteByFilename(filename);
+        const tcPara = tcNote ? tcNote.paragraphs[parsedData.lineIndex] : null;
+        const tcHasRepeat = tcPara && (tcPara.content || '').indexOf('@repeat') >= 0;
+        const tcWasOpen = tcPara && (tcPara.type === 'open' || tcPara.type === 'checklist');
         const result = toggleTaskComplete(filename, parsedData.lineIndex);
         if (result) {
           await sendToHTMLWindow(WINDOW_ID, 'TASK_UPDATED', {
@@ -1507,12 +1512,22 @@ async function onMessageFromHTMLView(actionType, data) {
             lineIndex: result.lineIndex,
             newType: result.newType,
           });
+          // If task had @repeat and was just completed, invoke Routine
+          if (tcHasRepeat && tcWasOpen && (result.newType === 'done' || result.newType === 'checklistDone')) {
+            try {
+              await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [tcNote]);
+            } catch (e) { console.log('WeeklyReview: Routine plugin not available: ' + String(e)); }
+          }
         }
         break;
       }
 
       case 'toggleTaskCancel': {
         const filename = decSafe(parsedData.encodedFilename);
+        const cnNote = DataStore.projectNoteByFilename(filename);
+        const cnPara = cnNote ? cnNote.paragraphs[parsedData.lineIndex] : null;
+        const cnHasRepeat = cnPara && (cnPara.content || '').indexOf('@repeat') >= 0;
+        const cnWasOpen = cnPara && (cnPara.type === 'open' || cnPara.type === 'checklist');
         const result = toggleTaskCancel(filename, parsedData.lineIndex);
         if (result) {
           await sendToHTMLWindow(WINDOW_ID, 'TASK_UPDATED', {
@@ -1520,6 +1535,12 @@ async function onMessageFromHTMLView(actionType, data) {
             lineIndex: result.lineIndex,
             newType: result.newType,
           });
+          // If task had @repeat and was just cancelled, invoke Routine
+          if (cnHasRepeat && cnWasOpen && (result.newType === 'cancelled' || result.newType === 'checklistCancelled')) {
+            try {
+              await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [cnNote]);
+            } catch (e) { console.log('WeeklyReview: Routine plugin not available: ' + String(e)); }
+          }
         }
         break;
       }
