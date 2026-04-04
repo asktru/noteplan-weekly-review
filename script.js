@@ -949,7 +949,7 @@ body {
 
 /* ---- Task Items ---- */
 .wr-task {
-  display: flex; align-items: flex-start; gap: 6px;
+  display: flex; align-items: baseline; gap: 6px;
   padding: 4px 4px; border-radius: var(--wr-radius-xs);
   transition: background 0.1s ease; position: relative;
 }
@@ -958,9 +958,8 @@ body {
 .wr-task.indent-2 { padding-left: 36px; }
 .wr-task.indent-3 { padding-left: 52px; }
 .wr-task-cb {
-  width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; cursor: pointer; font-size: 14px; transition: all 0.15s ease;
+  flex-shrink: 0; position: relative; top: 2px;
+  cursor: pointer; font-size: 14px; transition: all 0.15s ease;
 }
 .wr-task-cb.open { color: var(--wr-text-faint); }
 .wr-task-cb.open:hover { color: var(--wr-green); }
