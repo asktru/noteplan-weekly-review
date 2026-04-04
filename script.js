@@ -1518,22 +1518,31 @@ async function onMessageFromHTMLView(actionType, data) {
 
       case 'toggleTaskComplete': {
         const filename = decSafe(parsedData.encodedFilename);
-        // Check for @repeat before toggling (content may change after)
+        // Save window ID before cross-plugin call (Routine may overwrite globals)
+        const myWindowId = 'asktru.WeeklyReview.dashboard';
         const tcNote = DataStore.projectNoteByFilename(filename);
         const tcPara = tcNote ? tcNote.paragraphs[parsedData.lineIndex] : null;
         const tcHasRepeat = tcPara && (tcPara.content || '').indexOf('@repeat') >= 0;
         const tcWasOpen = tcPara && (tcPara.type === 'open' || tcPara.type === 'checklist');
         const result = toggleTaskComplete(filename, parsedData.lineIndex);
         if (result) {
-          await sendToHTMLWindow(WINDOW_ID, 'TASK_UPDATED', {
+          await sendToHTMLWindow(myWindowId, 'TASK_UPDATED', {
             encodedFilename: parsedData.encodedFilename,
             lineIndex: result.lineIndex,
             newType: result.newType,
           });
-          // If task had @repeat and was just completed, invoke Routine
+          // If task had @repeat and was just completed, invoke Routine then refresh card
           if (tcHasRepeat && tcWasOpen && (result.newType === 'done' || result.newType === 'checklistDone')) {
             try {
               await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [filename]);
+              // Re-fetch tasks to show the newly created repeat
+              const refreshedTasks = getNoteTasks(filename);
+              if (refreshedTasks) {
+                await sendToHTMLWindow(myWindowId, 'CARD_TASKS', {
+                  encodedFilename: parsedData.encodedFilename,
+                  sections: refreshedTasks.sections,
+                });
+              }
             } catch (e) { console.log('WeeklyReview: Routine plugin not available: ' + String(e)); }
           }
         }
@@ -1542,13 +1551,14 @@ async function onMessageFromHTMLView(actionType, data) {
 
       case 'toggleTaskCancel': {
         const filename = decSafe(parsedData.encodedFilename);
+        const myWindowId2 = 'asktru.WeeklyReview.dashboard';
         const cnNote = DataStore.projectNoteByFilename(filename);
         const cnPara = cnNote ? cnNote.paragraphs[parsedData.lineIndex] : null;
         const cnHasRepeat = cnPara && (cnPara.content || '').indexOf('@repeat') >= 0;
         const cnWasOpen = cnPara && (cnPara.type === 'open' || cnPara.type === 'checklist');
         const result = toggleTaskCancel(filename, parsedData.lineIndex);
         if (result) {
-          await sendToHTMLWindow(WINDOW_ID, 'TASK_UPDATED', {
+          await sendToHTMLWindow(myWindowId2, 'TASK_UPDATED', {
             encodedFilename: parsedData.encodedFilename,
             lineIndex: result.lineIndex,
             newType: result.newType,
@@ -1557,6 +1567,13 @@ async function onMessageFromHTMLView(actionType, data) {
           if (cnHasRepeat && cnWasOpen && (result.newType === 'cancelled' || result.newType === 'checklistCancelled')) {
             try {
               await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [filename]);
+              const cnRefreshed = getNoteTasks(filename);
+              if (cnRefreshed) {
+                await sendToHTMLWindow(myWindowId2, 'CARD_TASKS', {
+                  encodedFilename: parsedData.encodedFilename,
+                  sections: cnRefreshed.sections,
+                });
+              }
             } catch (e) { console.log('WeeklyReview: Routine plugin not available: ' + String(e)); }
           }
         }
