@@ -1533,7 +1533,12 @@ async function onMessageFromHTMLView(actionType, data) {
         const filename = decSafe(parsedData.encodedFilename);
         const note = DataStore.projectNoteByFilename(filename);
         if (note) {
-          await Editor.openNoteByFilename(filename);
+          var noteTitle = note.title || '';
+          if (noteTitle) {
+            NotePlan.openURL('noteplan://x-callback-url/openNote?noteTitle=' + encodeURIComponent(noteTitle) + '&splitView=yes');
+          } else {
+            await Editor.openNoteByFilename(filename);
+          }
         }
         break;
       }
