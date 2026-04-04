@@ -532,22 +532,24 @@ function buildCard(project) {
   const encodedFilename = encSafe(project.filename);
   const isActive = !project.completedDate && !project.cancelledDate && !project.isPaused;
 
-  let metaItems = '';
+  let metaLeft = '';
   if (project.folder) {
-    metaItems += `<span class="wr-card-meta-item wr-card-folder"><i class="fa-solid fa-folder"></i> ${esc(project.folder)}</span>`;
+    metaLeft += `<span class="wr-card-meta-item wr-card-folder"><i class="fa-solid fa-folder"></i> ${esc(project.folder)}</span>`;
   }
+  let metaRight = '';
   if (project.reviewInterval) {
-    metaItems += `<span class="wr-card-meta-item"><i class="fa-solid fa-arrows-rotate"></i> ${esc(formatInterval(project.reviewInterval))}</span>`;
+    metaRight += `<span class="wr-card-meta-item"><i class="fa-solid fa-arrows-rotate"></i> ${esc(formatInterval(project.reviewInterval))}</span>`;
   }
   if (project.reviewedDate) {
-    metaItems += `<span class="wr-card-meta-item"><i class="fa-regular fa-calendar-check"></i> ${esc(formatDate(project.reviewedDate))}</span>`;
+    metaRight += `<span class="wr-card-meta-item"><i class="fa-regular fa-calendar-check"></i> ${esc(formatDate(project.reviewedDate))}</span>`;
   }
   if (project.startDate) {
-    metaItems += `<span class="wr-card-meta-item"><i class="fa-solid fa-play"></i> Started ${esc(formatDate(project.startDate))}</span>`;
+    metaRight += `<span class="wr-card-meta-item"><i class="fa-solid fa-play"></i> Started ${esc(formatDate(project.startDate))}</span>`;
   }
   if (project.dueDate) {
-    metaItems += `<span class="wr-card-meta-item"><i class="fa-solid fa-flag"></i> Due ${esc(formatDate(project.dueDate))}</span>`;
+    metaRight += `<span class="wr-card-meta-item"><i class="fa-solid fa-flag"></i> Due ${esc(formatDate(project.dueDate))}</span>`;
   }
+  const metaItems = metaLeft + (metaRight ? '<span class="wr-card-meta-right">' + metaRight + '</span>' : '');
 
   const actionButtons = isActive
     ? `<button class="wr-card-action-btn review-btn" data-action="markReviewed" data-tooltip="Mark reviewed"><i class="fa-solid fa-check"></i></button>
@@ -914,10 +916,11 @@ body {
 }
 .wr-card-tag.area { background: var(--wr-blue-soft); color: var(--wr-blue); }
 .wr-card-tag.project { background: var(--wr-purple-soft); color: var(--wr-purple); }
-.wr-card-meta { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--wr-text-muted); flex-wrap: wrap; }
+.wr-card-meta { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--wr-text-muted); }
 .wr-card-meta-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; min-width: 0; }
 .wr-card-meta-item i { font-size: 10px; opacity: 0.7; flex-shrink: 0; }
-.wr-card-folder { color: var(--wr-text-faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; max-width: min(200px, 50vw); }
+.wr-card-folder { color: var(--wr-text-faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.wr-card-meta-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-left: auto; }
 .wr-progress-wrap { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .wr-progress-bar { flex: 1; height: 6px; background: var(--wr-border); border-radius: 100px; overflow: hidden; display: flex; }
 .wr-progress-fill { height: 100%; border-radius: 100px; transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
