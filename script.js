@@ -1237,13 +1237,17 @@ function toggleTaskComplete(filename, lineIndex) {
   const para = note.paragraphs[lineIndex];
   if (!para) return null;
 
-  if (para.type === 'done') {
+  if (para.type === 'done' || para.type === 'checklistDone') {
     // Uncomplete: set to open and remove @done()
-    para.type = 'open';
+    para.type = para.type === 'checklistDone' ? 'checklist' : 'open';
     para.content = (para.content || '').replace(/\s*@done\([^)]*\)/, '');
   } else {
-    // Complete
-    para.type = 'done';
+    // Complete — append @done(date) for Routine compatibility
+    var isChecklist = para.type === 'checklist';
+    para.type = isChecklist ? 'checklistDone' : 'done';
+    var now = new Date();
+    var doneStr = '@done(' + now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ')';
+    para.content = (para.content || '').trimEnd() + ' ' + doneStr;
   }
   note.updateParagraph(para);
   return { lineIndex, newType: para.type };
