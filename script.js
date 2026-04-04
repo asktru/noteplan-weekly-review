@@ -5,8 +5,8 @@
 // CONFIGURATION
 // ============================================
 
-const PLUGIN_ID = 'asktru.WeeklyReview';
-const WINDOW_ID = 'asktru.WeeklyReview.dashboard';
+var PLUGIN_ID = 'asktru.WeeklyReview';
+var WINDOW_ID = 'asktru.WeeklyReview.dashboard';
 
 function getSettings() {
   const settings = DataStore.settings || {};
