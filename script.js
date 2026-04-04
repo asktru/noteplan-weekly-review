@@ -399,7 +399,7 @@ function renderMarkdown(str) {
   // Wiki links: [[Note Name]]
   s = s.replace(/\[\[([^\]]+)\]\]/g, function(match, noteName) {
     var encoded = encodeURIComponent(noteName);
-    var url = 'noteplan://x-callback-url/openNote?noteTitle=' + encoded + '&amp;splitView=yes';
+    var url = 'noteplan://x-callback-url/openNote?noteTitle=' + encoded + '&amp;splitView=yes&amp;reuseSplitView=yes';
     return '<a class="wr-md-link" href="' + url + '" title="' + noteName.replace(/"/g, '&quot;') + '">' + noteName + '</a>';
   });
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a class="wr-md-link" href="$2" title="$2">$1</a>');
@@ -1538,7 +1538,7 @@ async function onMessageFromHTMLView(actionType, data) {
         if (note) {
           var noteTitle = note.title || '';
           if (noteTitle) {
-            NotePlan.openURL('noteplan://x-callback-url/openNote?noteTitle=' + encodeURIComponent(noteTitle) + '&splitView=yes');
+            NotePlan.openURL('noteplan://x-callback-url/openNote?noteTitle=' + encodeURIComponent(noteTitle) + '&splitView=yes&reuseSplitView=yes');
           } else {
             await Editor.openNoteByFilename(filename);
           }
