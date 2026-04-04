@@ -50,6 +50,14 @@
       "required": false
     },
     {
+      "key": "appendCompletionDate",
+      "title": "Append Completion Date",
+      "description": "When completing tasks, append @done(date time) to match NotePlan's 'Append Completion Date' setting.",
+      "type": "bool",
+      "default": true,
+      "required": false
+    },
+    {
       "key": "reviewMentionStr",
       "title": "Review Mention",
       "description": "The mention string used for review interval.",

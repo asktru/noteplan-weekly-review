@@ -17,6 +17,7 @@ function getSettings() {
     foldersToExclude: excludeStr.split(',').map(s => s.trim()).filter(Boolean),
     reviewMentionStr: settings.reviewMentionStr || '@review',
     reviewedMentionStr: settings.reviewedMentionStr || '@reviewed',
+    appendCompletionDate: settings.appendCompletionDate !== false && settings.appendCompletionDate !== 'false',
   };
 }
 
@@ -1231,23 +1232,37 @@ function getNoteTasks(filename) {
 /**
  * Toggle a task between open and done
  */
+function getDoneTag() {
+  var now = new Date();
+  var y = now.getFullYear();
+  var mo = String(now.getMonth() + 1).padStart(2, '0');
+  var d = String(now.getDate()).padStart(2, '0');
+  var h = now.getHours();
+  var mi = String(now.getMinutes()).padStart(2, '0');
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return '@done(' + y + '-' + mo + '-' + d + ' ' + String(h12).padStart(2, '0') + ':' + mi + ' ' + ampm + ')';
+}
+
 function toggleTaskComplete(filename, lineIndex) {
   const note = DataStore.projectNoteByFilename(filename);
   if (!note) return null;
   const para = note.paragraphs[lineIndex];
   if (!para) return null;
 
+  var config = getSettings();
   if (para.type === 'done' || para.type === 'checklistDone') {
     // Uncomplete: set to open and remove @done()
     para.type = para.type === 'checklistDone' ? 'checklist' : 'open';
     para.content = (para.content || '').replace(/\s*@done\([^)]*\)/, '');
   } else {
-    // Complete — append @done(date) for Routine compatibility
+    // Complete
     var isChecklist = para.type === 'checklist';
     para.type = isChecklist ? 'checklistDone' : 'done';
-    var now = new Date();
-    var doneStr = '@done(' + now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ')';
-    para.content = (para.content || '').trimEnd() + ' ' + doneStr;
+    if (config.appendCompletionDate) {
+      para.content = (para.content || '').trimEnd() + ' ' + getDoneTag();
+    }
   }
   note.updateParagraph(para);
   return { lineIndex, newType: para.type };
@@ -1518,7 +1533,7 @@ async function onMessageFromHTMLView(actionType, data) {
           // If task had @repeat and was just completed, invoke Routine
           if (tcHasRepeat && tcWasOpen && (result.newType === 'done' || result.newType === 'checklistDone')) {
             try {
-              await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [tcNote]);
+              await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [filename]);
             } catch (e) { console.log('WeeklyReview: Routine plugin not available: ' + String(e)); }
           }
         }
@@ -1541,7 +1556,7 @@ async function onMessageFromHTMLView(actionType, data) {
           // If task had @repeat and was just cancelled, invoke Routine
           if (cnHasRepeat && cnWasOpen && (result.newType === 'cancelled' || result.newType === 'checklistCancelled')) {
             try {
-              await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [cnNote]);
+              await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [filename]);
             } catch (e) { console.log('WeeklyReview: Routine plugin not available: ' + String(e)); }
           }
         }
