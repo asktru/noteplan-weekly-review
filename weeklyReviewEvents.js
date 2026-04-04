@@ -512,26 +512,43 @@ function updateCardStatus(data) {
 // FILTER TABS
 // ============================================
 
-function handleFilterClick(tab) {
-  var filter = tab.dataset.filter;
-  document.querySelectorAll('.wr-filter-tab').forEach(function(t) { t.classList.remove('active'); });
-  tab.classList.add('active');
+var activeStatusFilter = 'all';
+var activeTypeFilter = 'all';
 
+function handleFilterClick(btn) {
+  var filter = btn.dataset.filter;
+  if (filter) {
+    // Review status filter
+    activeStatusFilter = filter;
+    btn.closest('.wr-filter-group').querySelectorAll('.wr-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  var typeFilter = btn.dataset.typeFilter;
+  if (typeFilter) {
+    // Type filter
+    activeTypeFilter = typeFilter;
+    btn.closest('.wr-filter-group').querySelectorAll('.wr-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  applyFilters();
+}
+
+function applyFilters() {
   var cards = document.querySelectorAll('.wr-card');
   var sections = document.querySelectorAll('.wr-section');
 
   cards.forEach(function(card) {
-    if (filter === 'all') {
-      card.style.display = '';
-    } else if (filter === 'overdue') {
-      card.style.display = card.dataset.status === 'overdue' ? '' : 'none';
-    } else if (filter === 'due') {
-      card.style.display = (card.dataset.status === 'overdue' || card.dataset.status === 'due') ? '' : 'none';
-    } else if (filter === 'area') {
-      card.style.display = card.dataset.type === 'area' ? '' : 'none';
-    } else if (filter === 'project') {
-      card.style.display = card.dataset.type === 'project' ? '' : 'none';
+    var statusMatch = true;
+    var typeMatch = true;
+
+    if (activeStatusFilter !== 'all') {
+      statusMatch = card.dataset.status === activeStatusFilter;
     }
+    if (activeTypeFilter !== 'all') {
+      typeMatch = card.dataset.type === activeTypeFilter;
+    }
+
+    card.style.display = (statusMatch && typeMatch) ? '' : 'none';
   });
 
   sections.forEach(function(section) {
@@ -558,9 +575,9 @@ function showToast(message) {
 // ============================================
 
 function attachAllEventListeners() {
-  // Filter tabs
-  document.querySelectorAll('.wr-filter-tab').forEach(function(tab) {
-    tab.addEventListener('click', function() { handleFilterClick(tab); });
+  // Filter buttons (review status + type)
+  document.querySelectorAll('.wr-filter-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { handleFilterClick(btn); });
   });
 
   // Card clicks for expand/collapse

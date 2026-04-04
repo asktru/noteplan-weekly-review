@@ -577,72 +577,28 @@ function buildCard(project) {
 /**
  * Build the summary stats cards
  */
-function buildSummary(projects) {
-  const active = projects.filter(p => !p.completedDate && !p.cancelledDate && !p.isPaused);
-  const overdue = active.filter(p => p.reviewStatus === 'overdue').length;
-  const due = active.filter(p => p.reviewStatus === 'due').length;
-  const fresh = active.filter(p => p.reviewStatus === 'fresh').length;
-  const totalTasks = active.reduce((sum, p) => sum + p.tasks.total, 0);
-  const doneTasks = active.reduce((sum, p) => sum + p.tasks.done, 0);
-
-  return `<div class="wr-summary">
-    <div class="wr-stat-card">
-      <div class="wr-stat-value overdue">${overdue}</div>
-      <div class="wr-stat-label">Needs Review</div>
-    </div>
-    <div class="wr-stat-card">
-      <div class="wr-stat-value due">${due}</div>
-      <div class="wr-stat-label">Review Soon</div>
-    </div>
-    <div class="wr-stat-card">
-      <div class="wr-stat-value fresh">${fresh}</div>
-      <div class="wr-stat-label">On Track</div>
-    </div>
-    <div class="wr-stat-card">
-      <div class="wr-stat-value total">${active.length}</div>
-      <div class="wr-stat-label">Active</div>
-    </div>
-    <div class="wr-stat-card">
-      <div class="wr-stat-value total">${totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) + '%' : '—'}</div>
-      <div class="wr-stat-label">${doneTasks}/${totalTasks} Tasks Done</div>
-    </div>
-  </div>`;
-}
-
 /**
- * Build the filter tabs
+ * Build the unified filter bar: review status (left) + type (right)
  */
-function buildFilterTabs(projects) {
+function buildFilterBar(projects) {
   const active = projects.filter(p => !p.completedDate && !p.cancelledDate && !p.isPaused);
   const overdue = active.filter(p => p.reviewStatus === 'overdue').length;
   const reviewSoon = active.filter(p => p.reviewStatus === 'due').length;
+  const onTrack = active.filter(p => p.reviewStatus === 'fresh').length;
   const areas = projects.filter(p => p.tagType === 'area').length;
   const projectCount = projects.filter(p => p.tagType === 'project').length;
 
-  return `<div class="wr-filters">
-    <button class="wr-filter-tab active" data-filter="all">All<span class="wr-filter-count">${projects.length}</span></button>
-    <button class="wr-filter-tab" data-filter="overdue">Needs Review<span class="wr-filter-count">${overdue}</span></button>
-    <button class="wr-filter-tab" data-filter="due">Review Soon<span class="wr-filter-count">${reviewSoon}</span></button>
-    <button class="wr-filter-tab" data-filter="area">Areas<span class="wr-filter-count">${areas}</span></button>
-    <button class="wr-filter-tab" data-filter="project">Projects<span class="wr-filter-count">${projectCount}</span></button>
-  </div>`;
-}
-
-/**
- * Build the header bar
- */
-function buildHeader(projects) {
-  const active = projects.filter(p => !p.completedDate && !p.cancelledDate && !p.isPaused);
-  const overdue = active.filter(p => p.reviewStatus === 'overdue').length;
-  const due = active.filter(p => p.reviewStatus === 'due').length;
-
-  return `<div class="wr-header">
-    <span class="wr-header-title">Weekly Review</span>
-    <div class="wr-header-stats">
-      <span class="wr-header-stat"><span class="wr-header-stat-value overdue">${overdue}</span> needs review</span>
-      <span class="wr-header-stat"><span class="wr-header-stat-value due">${due}</span> review soon</span>
+  return `<div class="wr-filter-bar">
+    <div class="wr-filter-group">
+      <button class="wr-filter-btn active" data-filter="all">All <span class="wr-filter-count">${active.length}</span></button>
+      <button class="wr-filter-btn" data-filter="overdue">Needs Review <span class="wr-filter-count wr-count-overdue">${overdue}</span></button>
+      <button class="wr-filter-btn" data-filter="due">Review Soon <span class="wr-filter-count wr-count-due">${reviewSoon}</span></button>
+      <button class="wr-filter-btn" data-filter="fresh">On Track <span class="wr-filter-count wr-count-fresh">${onTrack}</span></button>
     </div>
-    <div class="wr-header-actions">
+    <div class="wr-filter-group wr-filter-type">
+      <button class="wr-filter-btn active" data-type-filter="all">All</button>
+      <button class="wr-filter-btn" data-type-filter="project">Projects <span class="wr-filter-count">${projectCount}</span></button>
+      <button class="wr-filter-btn" data-type-filter="area">Areas <span class="wr-filter-count">${areas}</span></button>
     </div>
   </div>`;
 }
@@ -653,10 +609,8 @@ function buildHeader(projects) {
 function buildDashboardHTML(projects) {
   let html = '';
 
-  html += buildHeader(projects);
-  html += buildFilterTabs(projects);
+  html += buildFilterBar(projects);
   html += '<div class="wr-body">';
-  html += buildSummary(projects);
 
   // Active items needing review
   const active = projects.filter(p => !p.completedDate && !p.cancelledDate && !p.isPaused);
@@ -831,53 +785,33 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
-.wr-header {
+.wr-filter-bar {
   position: sticky; top: 0; z-index: 100;
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 16px; flex-wrap: wrap;
   background: color-mix(in srgb, var(--wr-bg) 92%, transparent);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--wr-border);
 }
-.wr-header-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; flex-shrink: 0; }
-.wr-header-stats { display: flex; gap: 16px; margin-left: 8px; font-size: 12px; color: var(--wr-text-muted); }
-.wr-header-stat { display: flex; align-items: center; gap: 5px; }
-.wr-header-stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
-.wr-header-stat-value.overdue { color: var(--wr-red); }
-.wr-header-stat-value.due { color: var(--wr-yellow); }
-.wr-header-stat-value.fresh { color: var(--wr-green); }
-.wr-header-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
-.wr-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 11px; font-size: 12px; font-weight: 500;
-  border-radius: var(--wr-radius-sm);
-  border: 1px solid var(--wr-border-strong);
-  background: var(--wr-bg-card); color: var(--wr-text);
-  cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
-}
-.wr-btn:hover { background: var(--wr-bg-elevated); border-color: color-mix(in srgb, var(--wr-text) 25%, transparent); }
-.wr-btn:active { transform: scale(0.97); }
-.wr-btn i.fa-solid, .wr-btn i.fa-regular { font-size: 11px; }
-.wr-filters {
-  display: flex; gap: 4px; padding: 8px 16px;
-  border-bottom: 1px solid var(--wr-border);
-  background: var(--wr-bg); overflow-x: auto;
-}
-.wr-filter-tab {
+.wr-filter-group { display: flex; gap: 4px; align-items: center; }
+.wr-filter-btn {
   padding: 5px 12px; font-size: 12px; font-weight: 500;
   border-radius: 100px; border: none; background: transparent;
   color: var(--wr-text-muted); cursor: pointer;
   transition: all 0.15s ease; white-space: nowrap;
 }
-.wr-filter-tab:hover { background: var(--wr-border); color: var(--wr-text); }
-.wr-filter-tab.active { background: var(--wr-accent-soft); color: var(--wr-accent); font-weight: 600; }
+.wr-filter-btn:hover { background: var(--wr-border); color: var(--wr-text); }
+.wr-filter-btn.active { background: var(--wr-accent-soft); color: var(--wr-accent); font-weight: 600; }
 .wr-filter-count {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px; margin-left: 4px;
   font-size: 10px; font-weight: 700; border-radius: 100px;
   background: var(--wr-border); font-variant-numeric: tabular-nums;
 }
-.wr-filter-tab.active .wr-filter-count { background: var(--wr-accent); color: #fff; }
+.wr-filter-btn.active .wr-filter-count { background: var(--wr-accent); color: #fff; }
+.wr-count-overdue { color: var(--wr-red); }
+.wr-count-due { color: var(--wr-yellow); }
+.wr-count-fresh { color: var(--wr-green); }
 .wr-body { padding: 16px 16px 40px; }
 .wr-section { margin-bottom: 24px; }
 .wr-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 6px; }
@@ -945,14 +879,6 @@ body {
 .wr-review-pill.due { background: var(--wr-yellow-soft); color: var(--wr-yellow); }
 .wr-review-pill.fresh { background: var(--wr-green-soft); color: var(--wr-green); }
 .wr-review-pill.no-review { background: var(--wr-border); color: var(--wr-text-faint); }
-.wr-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: var(--wr-gap); margin-bottom: 20px; }
-.wr-stat-card { background: var(--wr-bg-card); border: 1px solid var(--wr-border); border-radius: var(--wr-radius); padding: 12px var(--wr-pad); text-align: center; }
-.wr-stat-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
-.wr-stat-value.overdue { color: var(--wr-red); }
-.wr-stat-value.due { color: var(--wr-yellow); }
-.wr-stat-value.fresh { color: var(--wr-green); }
-.wr-stat-value.total { color: var(--wr-text); }
-.wr-stat-label { font-size: 11px; color: var(--wr-text-muted); font-weight: 500; margin-top: 2px; }
 .wr-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 20px; text-align: center; }
 .wr-empty-icon { font-size: 36px; color: var(--wr-text-faint); margin-bottom: 12px; }
 .wr-empty-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
