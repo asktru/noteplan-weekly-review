@@ -891,11 +891,11 @@ body {
 .wr-card {
   display: grid; grid-template-columns: 6px 1fr auto; gap: 0;
   background: var(--wr-bg-card); border: 1px solid var(--wr-border);
-  border-radius: var(--wr-radius);
+  border-radius: var(--wr-radius); overflow: hidden;
   transition: all 0.15s ease; cursor: default;
 }
 .wr-card:hover { border-color: var(--wr-border-strong); box-shadow: 0 2px 8px color-mix(in srgb, black 8%, transparent); }
-.wr-card-stripe { border-radius: calc(var(--wr-radius) - 1px) 0 0 calc(var(--wr-radius) - 1px); }
+.wr-card-stripe { border-radius: 0; }
 .wr-card-stripe.overdue { background: var(--wr-red); }
 .wr-card-stripe.due { background: var(--wr-yellow); }
 .wr-card-stripe.fresh { background: var(--wr-green); }
@@ -994,7 +994,7 @@ body {
 
 /* ---- Expand/Collapse ---- */
 .wr-card { cursor: pointer; }
-.wr-card.expanded { border-color: var(--wr-accent); border-left-color: transparent; }
+.wr-card.expanded { border-color: var(--wr-accent); }
 .wr-card-expand-chevron {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; font-size: 10px; color: var(--wr-text-faint);
