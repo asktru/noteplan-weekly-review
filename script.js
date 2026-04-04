@@ -994,7 +994,7 @@ body {
 
 /* ---- Expand/Collapse ---- */
 .wr-card { cursor: pointer; }
-.wr-card.expanded { border-color: var(--wr-accent); }
+.wr-card.expanded { border-color: var(--wr-accent); border-left-color: transparent; }
 .wr-card-expand-chevron {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; font-size: 10px; color: var(--wr-text-faint);
