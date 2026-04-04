@@ -96,6 +96,18 @@
       "description": "Refresh the review dashboard data",
       "jsFunction": "refreshDashboard",
       "hidden": true
+    },
+    {
+      "name": "Turn into project",
+      "alias": ["make project", "set project"],
+      "description": "Set the current note as a project with frontmatter-based review tracking. Migrates existing hashtag and mention syntax to frontmatter.",
+      "jsFunction": "turnIntoProject"
+    },
+    {
+      "name": "Turn into area",
+      "alias": ["make area", "set area"],
+      "description": "Set the current note as an area with frontmatter-based review tracking. Migrates existing hashtag and mention syntax to frontmatter.",
+      "jsFunction": "turnIntoArea"
     }
   ]
 }

@@ -132,6 +132,94 @@ function decSafe(str) {
 /**
  * Get value from @mention(value) in a mentions array
  */
+// ============================================
+// FRONTMATTER PARSING
+// ============================================
+
+function parseFrontmatter(content) {
+  if (!content) return { frontmatter: {}, body: content || '' };
+  var lines = content.split('\n');
+  if (lines[0].trim() !== '---') return { frontmatter: {}, body: content };
+  var endIdx = -1;
+  for (var i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === '---') { endIdx = i; break; }
+  }
+  if (endIdx < 0) return { frontmatter: {}, body: content };
+  var fm = {};
+  for (var j = 1; j < endIdx; j++) {
+    var line = lines[j];
+    var colonIdx = line.indexOf(':');
+    if (colonIdx < 0) continue;
+    var key = line.substring(0, colonIdx).trim();
+    var val = line.substring(colonIdx + 1).trim();
+    if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+      val = val.substring(1, val.length - 1);
+    }
+    fm[key] = val;
+  }
+  return { frontmatter: fm, body: lines.slice(endIdx + 1).join('\n') };
+}
+
+function setFrontmatterKey(note, key, value) {
+  var content = note.content || '';
+  var lines = content.split('\n');
+  if (lines[0].trim() === '---') {
+    var endIdx = -1;
+    for (var i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === '---') { endIdx = i; break; }
+    }
+    if (endIdx > 0) {
+      var found = false;
+      for (var j = 1; j < endIdx; j++) {
+        if (lines[j].match(new RegExp('^' + key + '\\s*:'))) {
+          lines[j] = key + ': ' + value;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        lines.splice(endIdx, 0, key + ': ' + value);
+      }
+      note.content = lines.join('\n');
+      return;
+    }
+  }
+  // No frontmatter — create one
+  lines.unshift('---', key + ': ' + value, '---');
+  note.content = lines.join('\n');
+}
+
+function removeFrontmatterKey(content, key) {
+  var lines = content.split('\n');
+  if (lines[0].trim() !== '---') return content;
+  var endIdx = -1;
+  for (var i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === '---') { endIdx = i; break; }
+  }
+  if (endIdx < 0) return content;
+  for (var j = 1; j < endIdx; j++) {
+    if (lines[j].match(new RegExp('^' + key + '\\s*:'))) {
+      lines.splice(j, 1);
+      endIdx--;
+      break;
+    }
+  }
+  // Remove empty frontmatter
+  var hasContent = false;
+  for (var k = 1; k < endIdx; k++) {
+    if (lines[k].trim() !== '') { hasContent = true; break; }
+  }
+  if (!hasContent) {
+    lines.splice(0, endIdx + 1);
+    while (lines.length > 0 && lines[0].trim() === '') lines.shift();
+  }
+  return lines.join('\n');
+}
+
+// ============================================
+// MENTION UTILITIES
+// ============================================
+
 function getMentionValue(mentions, key) {
   if (!mentions || !key) return null;
   const prefix = key + '(';
@@ -191,20 +279,25 @@ function scanProjects() {
     });
     if (shouldExclude) continue;
 
-    // Check if note has one of our tags
-    const matchedTag = getMatchedTag(note, config.projectTypeTags);
+    // Check frontmatter first, then fall back to hashtags
+    const noteContent = note.content || '';
+    const fm = parseFrontmatter(noteContent).frontmatter;
+    const hasFmType = fm.type === 'project' || fm.type === 'area';
+
+    const matchedTag = hasFmType ? (fm.type === 'area' ? '#area' : '#project') : getMatchedTag(note, config.projectTypeTags);
     if (!matchedTag) continue;
 
     const mentions = note.mentions || [];
     const hashtags = note.hashtags || [];
+    const useFrontmatter = hasFmType; // prefer frontmatter if type is set there
 
-    // Parse review metadata
-    const reviewInterval = getMentionValue(mentions, config.reviewMentionStr);
-    const reviewedDate = getMentionValue(mentions, config.reviewedMentionStr);
-    const startDate = getMentionValue(mentions, '@start');
-    const dueDate = getMentionValue(mentions, '@due');
-    const completedDate = getMentionValue(mentions, '@completed');
-    const cancelledDate = getMentionValue(mentions, '@cancelled');
+    // Parse review metadata — frontmatter takes priority over mentions
+    const reviewInterval = (useFrontmatter && fm.review) ? fm.review : getMentionValue(mentions, config.reviewMentionStr);
+    const reviewedDate = (useFrontmatter && fm.reviewed) ? fm.reviewed : getMentionValue(mentions, config.reviewedMentionStr);
+    const startDate = fm.start || getMentionValue(mentions, '@start');
+    const dueDate = fm.due || getMentionValue(mentions, '@due');
+    const completedDate = fm.completed || getMentionValue(mentions, '@completed');
+    const cancelledDate = fm.cancelled || getMentionValue(mentions, '@cancelled');
 
     // Calculate next review date and days until due
     const today = getTodayStr();
@@ -1087,13 +1180,23 @@ function updateReviewedDate(note) {
   if (!note) return false;
   const config = getSettings();
   const today = getTodayStr();
+
+  // Check if note uses frontmatter
+  const fm = parseFrontmatter(note.content || '').frontmatter;
+  if (fm.type === 'project' || fm.type === 'area' || fm.reviewed !== undefined || fm.review !== undefined) {
+    // Update via frontmatter
+    setFrontmatterKey(note, 'reviewed', today);
+    DataStore.updateCache(note, true);
+    return true;
+  }
+
+  // Fall back to mention-based update
   const newMention = `${config.reviewedMentionStr}(${today})`;
   const reviewedPattern = new RegExp(config.reviewedMentionStr.replace('@', '@') + '\\([^)]*\\)');
 
   const paras = note.paragraphs;
   if (!paras || paras.length < 2) return false;
 
-  // Find the metadata line — look for line containing @review
   let metaLineIdx = -1;
   for (let i = 1; i < Math.min(paras.length, 10); i++) {
     const content = paras[i].content || '';
@@ -1103,17 +1206,14 @@ function updateReviewedDate(note) {
     }
   }
 
-  // Default to line 1 if not found
   if (metaLineIdx === -1) metaLineIdx = 1;
 
   const para = paras[metaLineIdx];
   let content = para.content || '';
 
   if (reviewedPattern.test(content)) {
-    // Replace existing @reviewed(date)
     content = content.replace(reviewedPattern, newMention);
   } else {
-    // Append @reviewed(date) to the metadata line
     content = content.trimEnd() + ' ' + newMention;
   }
 
@@ -1591,7 +1691,95 @@ async function sendToHTMLWindow(windowId, type, data) {
 // EXPORTS — NotePlan requires globalThis assignment
 // ============================================
 
+// ============================================
+// SLASH COMMANDS: Turn into project/area
+// ============================================
+
+function removeBodyTag(note, tag) {
+  var paras = note.paragraphs;
+  var cleanTag = tag.startsWith('#') ? tag : '#' + tag;
+  for (var i = 0; i < paras.length; i++) {
+    var content = paras[i].content || '';
+    if (content.indexOf(cleanTag) >= 0) {
+      paras[i].content = content.replace(new RegExp('\\s*' + cleanTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), '').trim();
+      note.updateParagraph(paras[i]);
+    }
+  }
+}
+
+function removeBodyMention(note, mentionKey) {
+  var paras = note.paragraphs;
+  var pattern = new RegExp('\\s*' + mentionKey.replace('@', '@') + '\\([^)]*\\)', 'g');
+  for (var i = 0; i < paras.length; i++) {
+    var content = paras[i].content || '';
+    if (pattern.test(content)) {
+      paras[i].content = content.replace(pattern, '').trim();
+      note.updateParagraph(paras[i]);
+    }
+  }
+}
+
+async function turnIntoProject() {
+  var note = Editor.note;
+  if (!note) { await CommandBar.prompt('No note open', 'Open a note first.'); return; }
+
+  setFrontmatterKey(note, 'type', 'project');
+
+  var config = getSettings();
+  var mentions = note.mentions || [];
+  var reviewVal = getMentionValue(mentions, config.reviewMentionStr);
+  var reviewedVal = getMentionValue(mentions, config.reviewedMentionStr);
+  if (reviewVal) {
+    setFrontmatterKey(note, 'review', reviewVal);
+    removeBodyMention(note, config.reviewMentionStr);
+  }
+  if (reviewedVal) {
+    setFrontmatterKey(note, 'reviewed', reviewedVal);
+    removeBodyMention(note, config.reviewedMentionStr);
+  }
+
+  removeBodyTag(note, '#project');
+  removeBodyTag(note, '#area');
+
+  var fm = parseFrontmatter(note.content || '').frontmatter;
+  if (!fm.review) setFrontmatterKey(note, 'review', '1w');
+
+  DataStore.updateCache(note, true);
+  await CommandBar.prompt('Turned into project', 'Note is now a project with frontmatter-based review tracking.');
+}
+
+async function turnIntoArea() {
+  var note = Editor.note;
+  if (!note) { await CommandBar.prompt('No note open', 'Open a note first.'); return; }
+
+  setFrontmatterKey(note, 'type', 'area');
+
+  var config = getSettings();
+  var mentions = note.mentions || [];
+  var reviewVal = getMentionValue(mentions, config.reviewMentionStr);
+  var reviewedVal = getMentionValue(mentions, config.reviewedMentionStr);
+  if (reviewVal) {
+    setFrontmatterKey(note, 'review', reviewVal);
+    removeBodyMention(note, config.reviewMentionStr);
+  }
+  if (reviewedVal) {
+    setFrontmatterKey(note, 'reviewed', reviewedVal);
+    removeBodyMention(note, config.reviewedMentionStr);
+  }
+
+  removeBodyTag(note, '#project');
+  removeBodyTag(note, '#area');
+
+  var fm = parseFrontmatter(note.content || '').frontmatter;
+  if (!fm.review) setFrontmatterKey(note, 'review', '1w');
+
+  DataStore.updateCache(note, true);
+  await CommandBar.prompt('Turned into area', 'Note is now an area with frontmatter-based review tracking.');
+}
+
 globalThis.showWeeklyReviewDashboard = showWeeklyReviewDashboard;
 globalThis.onMessageFromHTMLView = onMessageFromHTMLView;
 globalThis.markCurrentNoteReviewed = markCurrentNoteReviewed;
 globalThis.refreshDashboard = refreshDashboard;
+globalThis.turnIntoProject = turnIntoProject;
+globalThis.turnIntoArea = turnIntoArea;
