@@ -1735,7 +1735,9 @@ async function turnIntoProject() {
   if (!fm.review) setFrontmatterKey(note, 'review', '1w');
 
   DataStore.updateCache(note, true);
-  await CommandBar.prompt('Turned into project', 'Note is now a project with frontmatter-based review tracking.');
+  // Re-open the note to ensure it stays selected after content change
+  await Editor.openNoteByFilename(note.filename);
+  await CommandBar.prompt('Done', 'Note is now a project with frontmatter-based review tracking.');
 }
 
 async function turnIntoArea() {
@@ -1764,7 +1766,8 @@ async function turnIntoArea() {
   if (!fm.review) setFrontmatterKey(note, 'review', '1w');
 
   DataStore.updateCache(note, true);
-  await CommandBar.prompt('Turned into area', 'Note is now an area with frontmatter-based review tracking.');
+  await Editor.openNoteByFilename(note.filename);
+  await CommandBar.prompt('Done', 'Note is now an area with frontmatter-based review tracking.');
 }
 
 globalThis.showWeeklyReviewDashboard = showWeeklyReviewDashboard;
