@@ -6,7 +6,7 @@
   "plugin.description": "A beautiful dashboard for reviewing your projects and areas on a schedule.",
   "plugin.icon": "🔄",
   "plugin.author": "asktru",
-  "plugin.version": "1.0.0",
+  "plugin.version": "1.1.1",
   "plugin.lastUpdateInfo": "Initial release",
   "plugin.script": "script.js",
   "plugin.isRemote": "false",
