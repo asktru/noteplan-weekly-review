@@ -414,6 +414,10 @@ function renderMarkdown(str) {
   s = s.replace(/==([^=]+)==/g, '<mark class="wr-md-highlight">$1</mark>');
   s = s.replace(/(^|[\s(])#([\w][\w/-]*)/g, '$1<span class="wr-tag">#$2</span>');
   s = s.replace(/(^|[\s(])@([\w][\w/-]*(?:\([^)]*\))?)/g, '$1<span class="wr-mention">@$2</span>');
+  // Inline comments: /* ... */
+  s = s.replace(/\/\*([^*]*(?:\*(?!\/)[^*]*)*)\*\//g, '<span class="wr-comment">/*$1*/</span>');
+  // End-line comments: // ... (but not URLs like https://)
+  s = s.replace(/(^|[^:])\/\/\s(.*)$/g, '$1<span class="wr-comment">// $2</span>');
   return s;
 }
 
@@ -1010,6 +1014,9 @@ ${priCSS('wr-task-pri')}
 }
 .wr-tag, .wr-mention {
   color: var(--wr-orange); font-weight: 600;
+}
+.wr-comment {
+  color: var(--wr-text-faint); font-style: italic;
 }
 
 /* Task hover actions */
