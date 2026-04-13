@@ -561,7 +561,7 @@ function buildCard(project) {
        <button class="wr-card-action-btn open-btn" data-action="openNote" data-tooltip="Open note"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
     : `<button class="wr-card-action-btn open-btn" data-action="openNote" data-tooltip="Open note"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
 
-  return `<div class="wr-card" data-encoded-filename="${encodedFilename}" data-status="${project.reviewStatus}" data-type="${project.tagType}">
+  return `<div class="wr-card" data-encoded-filename="${encodedFilename}" data-status="${project.reviewStatus}" data-type="${project.tagType}" data-open-tasks="${project.tasks.open}">
     <div class="wr-card-stripe ${project.reviewStatus}"></div>
     <div class="wr-card-body">
       <div class="wr-card-top">
@@ -875,6 +875,12 @@ body {
 .wr-card-action-btn:hover { background: var(--wr-border); color: var(--wr-text); }
 .wr-card-action-btn.review-btn:hover { background: var(--wr-green-soft); color: var(--wr-green); }
 .wr-card-action-btn.open-btn:hover { background: var(--wr-accent-soft); color: var(--wr-accent); }
+.wr-card-action-btn.archive-btn:hover { background: var(--wr-yellow-soft); color: var(--wr-yellow); }
+@keyframes cardArchiveOut {
+  from { opacity: 1; max-height: 200px; margin-bottom: 0; }
+  to { opacity: 0; max-height: 0; margin-bottom: -8px; overflow: hidden; }
+}
+.wr-card.archiving { animation: cardArchiveOut 0.35s ease forwards; pointer-events: none; }
 .wr-review-pill {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px; font-size: 10px; font-weight: 600;
@@ -1641,6 +1647,36 @@ async function onMessageFromHTMLView(actionType, data) {
               sections: taskData.sections,
             });
           }
+        }
+        break;
+      }
+
+      case 'archiveNote': {
+        const filename = decSafe(parsedData.encodedFilename);
+        const note = DataStore.projectNoteByFilename(filename);
+        if (!note) {
+          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Note not found' });
+          break;
+        }
+        // Verify no open tasks remain
+        const archTasks = countTasks(note);
+        if (archTasks.open > 0) {
+          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Cannot archive: ' + archTasks.open + ' open task(s) remain' });
+          break;
+        }
+        // Compute archive folder: @Archive/YYYY-MM-DD/{originalFolder}/
+        const today = getTodayStr();
+        const parts = filename.split('/');
+        const originalFolder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+        const archiveFolder = '@Archive/' + today + (originalFolder ? '/' + originalFolder : '');
+        const newFilename = DataStore.moveNote(filename, archiveFolder);
+        if (newFilename) {
+          await sendToHTMLWindow(WINDOW_ID, 'CARD_ARCHIVED', {
+            encodedFilename: parsedData.encodedFilename,
+          });
+          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Archived: ' + (note.title || filename) });
+        } else {
+          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Failed to archive note' });
         }
         break;
       }

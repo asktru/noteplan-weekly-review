@@ -70,6 +70,9 @@ function onMessageFromPlugin(type, data) {
     case 'TASK_SCHEDULED':
       handleTaskScheduled(data);
       break;
+    case 'CARD_ARCHIVED':
+      handleCardArchived(data);
+      break;
     case 'FULL_REFRESH':
       window.location.reload();
       break;
@@ -101,6 +104,9 @@ function handleCardClick(e) {
     card.classList.remove('expanded');
     var expanded = card.querySelector('.wr-card-expanded');
     if (expanded) expanded.remove();
+    // Remove archive button when collapsing
+    var archBtn = card.querySelector('.wr-card-actions .archive-btn');
+    if (archBtn) archBtn.remove();
   } else {
     // Expand — request task data from plugin
     card.classList.add('expanded');
@@ -169,6 +175,9 @@ function renderExpandedTasks(encodedFilename, sections) {
   container.appendChild(addRow);
 
   card.appendChild(container);
+
+  // Show or hide archive button based on open task count
+  updateArchiveButton(card, sections);
 }
 
 function createTaskElement(task, encodedFilename) {
@@ -468,6 +477,9 @@ function handleTaskUpdated(data) {
       else icon.className = 'fa-regular fa-circle';
     }
   }
+
+  // Re-evaluate archive button visibility
+  updateArchiveButton(card, null);
 }
 
 function handlePriorityChanged(data) {
@@ -506,6 +518,58 @@ function updateCardStatus(data) {
     pill.appendChild(document.createTextNode(' Reviewed today'));
   }
   showToast('Marked as reviewed');
+}
+
+// ============================================
+// ARCHIVE
+// ============================================
+
+function handleCardArchived(data) {
+  var card = document.querySelector('.wr-card[data-encoded-filename="' + data.encodedFilename + '"]');
+  if (!card) return;
+  card.classList.add('archiving');
+  setTimeout(function() { card.remove(); }, 400);
+}
+
+function updateArchiveButton(card, sections) {
+  // Count open tasks — from sections data if available, else from DOM
+  var openCount = 0;
+  if (sections) {
+    for (var s = 0; s < sections.length; s++) {
+      for (var t = 0; t < sections[s].tasks.length; t++) {
+        if (sections[s].tasks[t].type === 'open') openCount++;
+      }
+    }
+  } else {
+    var tasks = card.querySelectorAll('.wr-task');
+    for (var i = 0; i < tasks.length; i++) {
+      if (!tasks[i].classList.contains('is-done') && !tasks[i].classList.contains('is-cancelled')) openCount++;
+    }
+  }
+
+  var actions = card.querySelector('.wr-card-actions');
+  if (!actions) return;
+  var existing = actions.querySelector('.archive-btn');
+
+  if (openCount === 0) {
+    if (!existing) {
+      var btn = document.createElement('button');
+      btn.className = 'wr-card-action-btn archive-btn';
+      btn.setAttribute('data-tooltip', 'Archive');
+      btn.setAttribute('data-action', 'archiveNote');
+      var icon = document.createElement('i');
+      icon.className = 'fa-solid fa-box-archive';
+      btn.appendChild(icon);
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var c = this.closest('.wr-card');
+        if (c) sendMessageToPlugin('archiveNote', { encodedFilename: c.dataset.encodedFilename });
+      });
+      actions.appendChild(btn);
+    }
+  } else if (existing) {
+    existing.remove();
+  }
 }
 
 // ============================================
