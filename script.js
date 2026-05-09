@@ -1167,7 +1167,7 @@ body.wr-hide-done-tasks .wr-task.is-cancelled { display: none; }
 
 /* ---- Task Items ---- */
 .wr-task {
-  display: flex; align-items: baseline; gap: 6px;
+  display: flex; align-items: flex-start; gap: 6px;
   padding: 4px 4px; border-radius: var(--wr-radius-xs);
   transition: background 0.1s ease; position: relative;
 }
@@ -1176,7 +1176,7 @@ body.wr-hide-done-tasks .wr-task.is-cancelled { display: none; }
 .wr-task.indent-2 { padding-left: 36px; }
 .wr-task.indent-3 { padding-left: 52px; }
 .wr-task-cb {
-  flex-shrink: 0; position: relative; top: 2px;
+  flex-shrink: 0; line-height: 22.5px;
   cursor: pointer; font-size: 14px; transition: all 0.15s ease;
 }
 .wr-task-cb.open { color: var(--wr-text-faint); }
@@ -1195,7 +1195,7 @@ body.wr-hide-done-tasks .wr-task.is-cancelled { display: none; }
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0 4px; height: 16px; border-radius: 3px;
   font-size: 9px; font-weight: 800; flex-shrink: 0; cursor: pointer;
-  margin-top: 2px; transition: all 0.15s ease;
+  margin-top: 3px; transition: all 0.15s ease;
 }
 ${priCSS('wr-task-pri')}
 
@@ -1204,7 +1204,7 @@ ${priCSS('wr-task-pri')}
   display: inline-flex; align-items: center; gap: 3px;
   padding: 0 5px; height: 16px; border-radius: 3px;
   font-size: 10px; color: var(--wr-text-muted); flex-shrink: 0;
-  background: var(--wr-border); cursor: pointer; margin-top: 2px;
+  background: var(--wr-border); cursor: pointer; margin-top: 3px;
 }
 .wr-task-sched:hover { background: var(--wr-border-strong); }
 
@@ -1234,7 +1234,7 @@ ${priCSS('wr-task-pri')}
 
 /* Task hover actions */
 .wr-task-acts {
-  display: none; align-items: center; gap: 2px; flex-shrink: 0; margin-top: 1px;
+  display: none; align-items: center; gap: 2px; flex-shrink: 0; margin-top: 1.5px;
 }
 .wr-task:hover .wr-task-acts { display: flex; }
 .wr-task-act {
