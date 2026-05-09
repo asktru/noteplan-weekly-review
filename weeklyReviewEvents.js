@@ -488,9 +488,7 @@ function bindMetaEditable(scope) {
     el.dataset.bound = '1';
     el.addEventListener('click', function(e) {
       e.stopPropagation();
-      var action = el.dataset.action;
-      if (action === 'editInterval') showIntervalPicker(el);
-      else if (action === 'editReviewedDate') showReviewedDatePicker(el);
+      if (el.dataset.action === 'editInterval') showIntervalPicker(el);
     });
   });
 }
@@ -570,64 +568,6 @@ function showIntervalPicker(anchorEl) {
   document.body.appendChild(picker);
   positionPickerAt(picker, anchorEl);
   setTimeout(function() { document.addEventListener('click', closePickerOnOutsideClick); }, 10);
-}
-
-function showReviewedDatePicker(anchorEl) {
-  closeAllPickers();
-  var card = anchorEl.closest('.wr-card');
-  if (!card) return;
-  var encodedFilename = card.dataset.encodedFilename;
-
-  var picker = document.createElement('div');
-  picker.className = 'wr-sched-picker';
-  picker.dataset.encodedFilename = encodedFilename;
-  picker.dataset.kind = 'reviewedDate';
-
-  function send(date) {
-    sendMessageToPlugin('setReviewedDate', { encodedFilename: encodedFilename, date: date });
-    closeAllPickers();
-  }
-
-  var presets = [
-    { label: 'Today', value: todayStr() },
-    { label: 'Yesterday', value: shiftDay(-1) },
-    { label: '3 days ago', value: shiftDay(-3) },
-    { label: 'A week ago', value: shiftDay(-7) },
-  ];
-  presets.forEach(function(opt) {
-    var b = document.createElement('button');
-    b.className = 'wr-sched-opt';
-    b.textContent = opt.label;
-    b.addEventListener('click', function(e) { e.stopPropagation(); send(opt.value); });
-    picker.appendChild(b);
-  });
-
-  var dateInput = document.createElement('input');
-  dateInput.type = 'date';
-  dateInput.className = 'wr-sched-date-input';
-  dateInput.addEventListener('change', function(e) {
-    e.stopPropagation();
-    if (this.value) send(this.value);
-  });
-  picker.appendChild(dateInput);
-
-  if (!anchorEl.classList.contains('wr-meta-empty')) {
-    var clearOpt = document.createElement('button');
-    clearOpt.className = 'wr-sched-opt wr-sched-clear danger';
-    clearOpt.textContent = 'Clear last review date';
-    clearOpt.addEventListener('click', function(e) { e.stopPropagation(); send(''); });
-    picker.appendChild(clearOpt);
-  }
-
-  document.body.appendChild(picker);
-  positionPickerAt(picker, anchorEl);
-  setTimeout(function() { document.addEventListener('click', closePickerOnOutsideClick); }, 10);
-}
-
-function shiftDay(delta) {
-  var d = new Date();
-  d.setDate(d.getDate() + delta);
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
 function positionPickerAt(picker, anchorEl) {

@@ -562,9 +562,9 @@ function buildCardMetaHTML(project) {
     metaRight += `<span class="wr-card-meta-item wr-meta-editable wr-meta-empty" data-action="editInterval" data-tooltip="Set review schedule"><i class="fa-solid fa-arrows-rotate"></i> Set schedule</span>`;
   }
   if (project.reviewedDate) {
-    metaRight += `<span class="wr-card-meta-item wr-meta-editable" data-action="editReviewedDate" data-tooltip="Change last review date"><i class="fa-regular fa-calendar-check"></i> ${esc(formatDate(project.reviewedDate))}</span>`;
+    metaRight += `<span class="wr-card-meta-item"><i class="fa-regular fa-calendar-check"></i> Last review: ${esc(formatDate(project.reviewedDate))}</span>`;
   } else if (project.reviewInterval) {
-    metaRight += `<span class="wr-card-meta-item wr-meta-editable wr-meta-empty" data-action="editReviewedDate" data-tooltip="Set last review date"><i class="fa-regular fa-calendar-check"></i> Never reviewed</span>`;
+    metaRight += `<span class="wr-card-meta-item wr-meta-empty"><i class="fa-regular fa-calendar-check"></i> Never reviewed</span>`;
   }
   if (project.startDate) {
     metaRight += `<span class="wr-card-meta-item"><i class="fa-solid fa-play"></i> Started ${esc(formatDate(project.startDate))}</span>`;
@@ -1430,29 +1430,6 @@ function setReviewIntervalForNote(filename, value) {
 }
 
 /**
- * Update the @reviewed date. value=null clears it (i.e., never reviewed).
- */
-function setReviewedDateForNote(filename, value) {
-  const note = DataStore.projectNoteByFilename(filename);
-  if (!note) return false;
-  const config = getSettings();
-  const fm = parseFrontmatter(note.content || '').frontmatter;
-  const usesFrontmatter = fm.type === 'project' || fm.type === 'area' || fm.reviewed !== undefined || fm.review !== undefined;
-
-  if (usesFrontmatter) {
-    if (value) {
-      setFrontmatterKey(note, 'reviewed', value);
-    } else {
-      note.content = removeFrontmatterKey(note.content || '', 'reviewed');
-    }
-  } else {
-    setOrClearMention(note, config.reviewedMentionStr, value);
-  }
-  DataStore.updateCache(note, true);
-  return true;
-}
-
-/**
  * Re-scan a single project (by filename) so we can refresh the card after a mutation.
  */
 function rescanProject(filename) {
@@ -1824,24 +1801,6 @@ async function onMessageFromHTMLView(actionType, data) {
       case 'setReviewInterval': {
         const filename = decSafe(parsedData.encodedFilename);
         const ok = setReviewIntervalForNote(filename, parsedData.interval || null);
-        if (ok) {
-          const refreshed = rescanProject(filename);
-          if (refreshed) {
-            await sendToHTMLWindow(WINDOW_ID, 'CARD_META_UPDATED', {
-              encodedFilename: parsedData.encodedFilename,
-              metaHTML: buildCardMetaHTML(refreshed),
-              pillHTML: buildReviewPill(refreshed),
-              status: refreshed.reviewStatus,
-              lifecycle: refreshed.lifecycleStatus,
-            });
-          }
-        }
-        break;
-      }
-
-      case 'setReviewedDate': {
-        const filename = decSafe(parsedData.encodedFilename);
-        const ok = setReviewedDateForNote(filename, parsedData.date || null);
         if (ok) {
           const refreshed = rescanProject(filename);
           if (refreshed) {
