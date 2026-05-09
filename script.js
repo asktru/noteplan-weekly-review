@@ -319,14 +319,28 @@ function scanProjects() {
       }
     }
 
-    // Determine paused state
+    // Determine paused state (legacy hashtag)
     const isPaused = hashtags.includes('paused') || hashtags.includes('#paused');
+
+    // Determine lifecycle status from frontmatter `status` (preferred), else legacy signals
+    let lifecycleStatus = 'active';
+    if (fm.status) {
+      const s = String(fm.status).toLowerCase().trim();
+      if (s === 'canceled') lifecycleStatus = 'cancelled';
+      else if (['active', 'paused', 'someday', 'completed', 'cancelled'].includes(s)) lifecycleStatus = s;
+    }
+    if (lifecycleStatus === 'active') {
+      if (completedDate) lifecycleStatus = 'completed';
+      else if (cancelledDate) lifecycleStatus = 'cancelled';
+      else if (isPaused) lifecycleStatus = 'paused';
+    }
 
     // Determine review status
     let reviewStatus = 'no-review';
-    if (completedDate) reviewStatus = 'completed';
-    else if (cancelledDate) reviewStatus = 'cancelled';
-    else if (isPaused) reviewStatus = 'paused';
+    if (lifecycleStatus === 'completed') reviewStatus = 'completed';
+    else if (lifecycleStatus === 'cancelled') reviewStatus = 'cancelled';
+    else if (lifecycleStatus === 'paused') reviewStatus = 'paused';
+    else if (lifecycleStatus === 'someday') reviewStatus = 'someday';
     else if (daysUntilReview !== null) {
       if (daysUntilReview <= 0) reviewStatus = 'overdue';
       else if (daysUntilReview <= 2) reviewStatus = 'due';
@@ -359,13 +373,14 @@ function scanProjects() {
       completedDate,
       cancelledDate,
       isPaused,
+      lifecycleStatus,
       tasks,
     });
   }
 
   // Sort: overdue first (most overdue at top), then due, then fresh, then others
   projects.sort((a, b) => {
-    const statusOrder = { overdue: 0, due: 1, fresh: 2, 'no-review': 3, paused: 4, completed: 5, cancelled: 6 };
+    const statusOrder = { overdue: 0, due: 1, fresh: 2, 'no-review': 3, someday: 4, paused: 5, completed: 6, cancelled: 7 };
     const sa = statusOrder[a.reviewStatus] ?? 9;
     const sb = statusOrder[b.reviewStatus] ?? 9;
     if (sa !== sb) return sa - sb;
@@ -504,6 +519,7 @@ function buildReviewPill(project) {
   if (s === 'completed') return '<span class="wr-review-pill fresh"><i class="fa-solid fa-circle-check"></i> Completed</span>';
   if (s === 'cancelled') return '<span class="wr-review-pill no-review"><i class="fa-solid fa-circle-xmark"></i> Cancelled</span>';
   if (s === 'paused') return '<span class="wr-review-pill no-review"><i class="fa-solid fa-circle-pause"></i> Paused</span>';
+  if (s === 'someday') return '<span class="wr-review-pill no-review"><i class="fa-solid fa-cloud"></i> Someday</span>';
   if (s === 'overdue') {
     let label;
     if (!project.reviewedDate && project.daysUntilReview === 0) {
@@ -561,7 +577,7 @@ function buildCard(project) {
        <button class="wr-card-action-btn open-btn" data-action="openNote" data-tooltip="Open note"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
     : `<button class="wr-card-action-btn open-btn" data-action="openNote" data-tooltip="Open note"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
 
-  return `<div class="wr-card" data-encoded-filename="${encodedFilename}" data-status="${project.reviewStatus}" data-type="${project.tagType}" data-open-tasks="${project.tasks.open}">
+  return `<div class="wr-card" data-encoded-filename="${encodedFilename}" data-status="${project.reviewStatus}" data-type="${project.tagType}" data-lifecycle="${project.lifecycleStatus}" data-open-tasks="${project.tasks.open}">
     <div class="wr-card-stripe ${project.reviewStatus}"></div>
     <div class="wr-card-body">
       <div class="wr-card-top">
@@ -583,27 +599,108 @@ function buildCard(project) {
  * Build the summary stats cards
  */
 /**
- * Build the unified filter bar: review status (left) + type (right)
+ * Read persisted filter state (with sane defaults)
+ */
+function getFilterPrefs() {
+  let p = {};
+  try {
+    const raw = (typeof DataStore !== 'undefined' && DataStore.preference) ? DataStore.preference('asktru.WeeklyReview.filters') : null;
+    if (raw) p = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+  } catch (e) {}
+  return {
+    statusFilter: p.statusFilter || 'all',
+    typeFilter: p.typeFilter || 'all',
+    lifecycleFilter: p.lifecycleFilter || 'all',
+    hideCompletedTasks: !!p.hideCompletedTasks,
+  };
+}
+
+function setFilterPrefs(prefs) {
+  try {
+    if (typeof DataStore !== 'undefined' && DataStore.setPreference) {
+      DataStore.setPreference('asktru.WeeklyReview.filters', JSON.stringify(prefs || {}));
+    }
+  } catch (e) { console.log('WeeklyReview: setFilterPrefs failed: ' + String(e)); }
+}
+
+const LIFECYCLE_LABELS = { active: 'Active', paused: 'Paused', someday: 'Someday', completed: 'Completed', cancelled: 'Cancelled' };
+const TYPE_LABELS = { project: 'Projects', area: 'Areas' };
+
+/**
+ * Build the unified filter bar: review status pills + Show dropdown + hide-done toggle
  */
 function buildFilterBar(projects) {
-  const active = projects.filter(p => !p.completedDate && !p.cancelledDate && !p.isPaused);
+  const prefs = getFilterPrefs();
+  const active = projects.filter(p => p.lifecycleStatus === 'active');
   const overdue = active.filter(p => p.reviewStatus === 'overdue').length;
   const reviewSoon = active.filter(p => p.reviewStatus === 'due').length;
   const onTrack = active.filter(p => p.reviewStatus === 'fresh').length;
-  const areas = projects.filter(p => p.tagType === 'area').length;
-  const projectCount = projects.filter(p => p.tagType === 'project').length;
 
-  return `<div class="wr-filter-bar">
+  const typeCounts = { all: projects.length, project: 0, area: 0 };
+  const lifecycleCounts = { all: projects.length, active: 0, paused: 0, someday: 0, completed: 0, cancelled: 0 };
+  for (const p of projects) {
+    if (typeCounts[p.tagType] !== undefined) typeCounts[p.tagType]++;
+    if (lifecycleCounts[p.lifecycleStatus] !== undefined) lifecycleCounts[p.lifecycleStatus]++;
+  }
+
+  const sf = prefs.statusFilter, tf = prefs.typeFilter, lf = prefs.lifecycleFilter;
+  const cls = (cur, val) => cur === val ? ' active' : '';
+
+  // Show button label
+  let showLabel;
+  if (tf === 'all' && lf === 'all') showLabel = 'Show: All';
+  else {
+    const parts = [];
+    if (lf !== 'all') parts.push(LIFECYCLE_LABELS[lf]);
+    if (tf !== 'all') parts.push(TYPE_LABELS[tf].toLowerCase());
+    else if (lf !== 'all') parts.push('items');
+    showLabel = 'Show: ' + parts.join(' ');
+  }
+
+  const showOpt = (group, val, label, count) => {
+    const active = (group === 'type' ? tf : lf) === val;
+    const cnt = (count !== undefined && count !== null) ? `<span class="wr-show-count">${count}</span>` : '';
+    return `<button class="wr-show-opt${active ? ' active' : ''}" data-group="${group}" data-value="${val}">${label} ${cnt}</button>`;
+  };
+
+  return `<div class="wr-filter-bar"
+    data-status-filter="${sf}" data-type-filter="${tf}" data-lifecycle-filter="${lf}"
+    data-hide-done-tasks="${prefs.hideCompletedTasks ? '1' : '0'}">
     <div class="wr-filter-group">
-      <button class="wr-filter-btn active" data-filter="all">All <span class="wr-filter-count">${active.length}</span></button>
-      <button class="wr-filter-btn" data-filter="overdue">Needs Review <span class="wr-filter-count wr-count-overdue">${overdue}</span></button>
-      <button class="wr-filter-btn" data-filter="due">Review Soon <span class="wr-filter-count wr-count-due">${reviewSoon}</span></button>
-      <button class="wr-filter-btn" data-filter="fresh">On Track <span class="wr-filter-count wr-count-fresh">${onTrack}</span></button>
+      <button class="wr-filter-btn${cls(sf,'all')}" data-filter="all">All <span class="wr-filter-count">${active.length}</span></button>
+      <button class="wr-filter-btn${cls(sf,'overdue')}" data-filter="overdue">Needs Review <span class="wr-filter-count wr-count-overdue">${overdue}</span></button>
+      <button class="wr-filter-btn${cls(sf,'due')}" data-filter="due">Review Soon <span class="wr-filter-count wr-count-due">${reviewSoon}</span></button>
+      <button class="wr-filter-btn${cls(sf,'fresh')}" data-filter="fresh">On Track <span class="wr-filter-count wr-count-fresh">${onTrack}</span></button>
     </div>
-    <div class="wr-filter-group wr-filter-type">
-      <button class="wr-filter-btn active" data-type-filter="all">All</button>
-      <button class="wr-filter-btn" data-type-filter="project">Projects <span class="wr-filter-count">${projectCount}</span></button>
-      <button class="wr-filter-btn" data-type-filter="area">Areas <span class="wr-filter-count">${areas}</span></button>
+    <div class="wr-filter-group wr-filter-right">
+      <div class="wr-show-wrap">
+        <button class="wr-show-btn" id="wr-show-btn" type="button">
+          <i class="fa-solid fa-sliders"></i>
+          <span class="wr-show-label">${esc(showLabel)}</span>
+          <i class="fa-solid fa-caret-down"></i>
+        </button>
+        <div class="wr-show-popover" id="wr-show-popover" hidden>
+          <div class="wr-show-section">
+            <div class="wr-show-title">Type</div>
+            ${showOpt('type', 'all', 'All', typeCounts.all)}
+            ${showOpt('type', 'project', 'Projects', typeCounts.project)}
+            ${showOpt('type', 'area', 'Areas', typeCounts.area)}
+          </div>
+          <div class="wr-show-section">
+            <div class="wr-show-title">Status</div>
+            ${showOpt('lifecycle', 'all', 'All', lifecycleCounts.all)}
+            ${showOpt('lifecycle', 'active', 'Active', lifecycleCounts.active)}
+            ${showOpt('lifecycle', 'paused', 'Paused', lifecycleCounts.paused)}
+            ${showOpt('lifecycle', 'someday', 'Someday', lifecycleCounts.someday)}
+            ${showOpt('lifecycle', 'completed', 'Completed', lifecycleCounts.completed)}
+            ${showOpt('lifecycle', 'cancelled', 'Cancelled', lifecycleCounts.cancelled)}
+          </div>
+        </div>
+      </div>
+      <button class="wr-icon-toggle${prefs.hideCompletedTasks ? ' active' : ''}" id="wr-hide-done-btn" type="button"
+        data-tooltip="${prefs.hideCompletedTasks ? 'Show completed tasks' : 'Hide completed tasks'}">
+        <i class="fa-regular ${prefs.hideCompletedTasks ? 'fa-eye-slash' : 'fa-eye'}"></i>
+      </button>
     </div>
   </div>`;
 }
@@ -618,12 +715,12 @@ function buildDashboardHTML(projects) {
   html += '<div class="wr-body">';
 
   // Active items needing review
-  const active = projects.filter(p => !p.completedDate && !p.cancelledDate && !p.isPaused);
+  const active = projects.filter(p => p.lifecycleStatus === 'active');
   const needsReview = active.filter(p => p.reviewStatus === 'overdue');
   const reviewSoon = active.filter(p => p.reviewStatus === 'due');
   const onTrack = active.filter(p => p.reviewStatus === 'fresh');
   const noSchedule = active.filter(p => p.reviewStatus === 'no-review');
-  const inactive = projects.filter(p => p.completedDate || p.cancelledDate || p.isPaused);
+  const inactive = projects.filter(p => p.lifecycleStatus !== 'active');
 
   if (needsReview.length > 0) {
     html += `<div class="wr-section" data-section="needs-review">
@@ -817,6 +914,59 @@ body {
 .wr-count-overdue { color: var(--wr-red); }
 .wr-count-due { color: var(--wr-yellow); }
 .wr-count-fresh { color: var(--wr-green); }
+.wr-filter-right { gap: 6px; }
+.wr-show-wrap { position: relative; }
+.wr-show-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; font-size: 12px; font-weight: 500;
+  border-radius: 100px; border: 1px solid var(--wr-border);
+  background: transparent; color: var(--wr-text-muted); cursor: pointer;
+  transition: all 0.15s ease; white-space: nowrap;
+}
+.wr-show-btn:hover { background: var(--wr-border); color: var(--wr-text); border-color: var(--wr-border-strong); }
+.wr-show-btn .fa-caret-down { font-size: 10px; opacity: 0.7; }
+.wr-show-btn .fa-sliders { font-size: 11px; }
+.wr-show-popover {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 200;
+  min-width: 200px; padding: 6px;
+  background: var(--wr-bg-elevated); border: 1px solid var(--wr-border-strong);
+  border-radius: var(--wr-radius-sm);
+  box-shadow: 0 8px 24px color-mix(in srgb, black 25%, transparent);
+}
+.wr-show-popover[hidden] { display: none; }
+.wr-show-section + .wr-show-section { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--wr-border); }
+.wr-show-title {
+  padding: 4px 8px 2px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--wr-text-faint);
+}
+.wr-show-opt {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 6px 10px; font-size: 12px;
+  border: none; background: transparent; color: var(--wr-text);
+  text-align: left; border-radius: var(--wr-radius-xs); cursor: pointer;
+  transition: background 0.1s ease;
+}
+.wr-show-opt:hover { background: var(--wr-border); }
+.wr-show-opt.active { background: var(--wr-accent-soft); color: var(--wr-accent); font-weight: 600; }
+.wr-show-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px; padding: 0 5px;
+  font-size: 10px; font-weight: 600; border-radius: 100px;
+  background: var(--wr-border); color: var(--wr-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.wr-show-opt.active .wr-show-count { background: var(--wr-accent); color: #fff; }
+.wr-icon-toggle {
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 100px; border: 1px solid var(--wr-border);
+  background: transparent; color: var(--wr-text-muted); cursor: pointer;
+  transition: all 0.15s ease;
+}
+.wr-icon-toggle:hover { background: var(--wr-border); color: var(--wr-text); border-color: var(--wr-border-strong); }
+.wr-icon-toggle.active { background: var(--wr-accent-soft); color: var(--wr-accent); border-color: transparent; }
+body.wr-hide-done-tasks .wr-task.is-done,
+body.wr-hide-done-tasks .wr-task.is-cancelled { display: none; }
 .wr-body { padding: 16px 16px 40px; }
 .wr-section { margin-bottom: 24px; }
 .wr-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 6px; }
@@ -1505,6 +1655,11 @@ async function onMessageFromHTMLView(actionType, data) {
 
       case 'refreshDashboard': {
         await showWeeklyReviewDashboard();
+        break;
+      }
+
+      case 'saveFilters': {
+        setFilterPrefs(parsedData);
         break;
       }
 

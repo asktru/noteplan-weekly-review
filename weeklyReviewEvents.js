@@ -573,28 +573,113 @@ function updateArchiveButton(card, sections) {
 }
 
 // ============================================
-// FILTER TABS
+// FILTERS (review status + type + lifecycle + hide-done-tasks)
 // ============================================
 
-var activeStatusFilter = 'all';
-var activeTypeFilter = 'all';
+var filterState = {
+  statusFilter: 'all',
+  typeFilter: 'all',
+  lifecycleFilter: 'all',
+  hideCompletedTasks: false,
+};
+
+function readInitialFilterState() {
+  var bar = document.querySelector('.wr-filter-bar');
+  if (!bar) return;
+  filterState.statusFilter = bar.dataset.statusFilter || 'all';
+  filterState.typeFilter = bar.dataset.typeFilter || 'all';
+  filterState.lifecycleFilter = bar.dataset.lifecycleFilter || 'all';
+  filterState.hideCompletedTasks = bar.dataset.hideDoneTasks === '1';
+  applyHideDoneTasksClass();
+}
+
+function persistFilterState() {
+  sendMessageToPlugin('saveFilters', {
+    statusFilter: filterState.statusFilter,
+    typeFilter: filterState.typeFilter,
+    lifecycleFilter: filterState.lifecycleFilter,
+    hideCompletedTasks: filterState.hideCompletedTasks,
+  });
+}
 
 function handleFilterClick(btn) {
   var filter = btn.dataset.filter;
   if (filter) {
-    // Review status filter
-    activeStatusFilter = filter;
+    filterState.statusFilter = filter;
     btn.closest('.wr-filter-group').querySelectorAll('.wr-filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
+    applyFilters();
+    persistFilterState();
   }
-  var typeFilter = btn.dataset.typeFilter;
-  if (typeFilter) {
-    // Type filter
-    activeTypeFilter = typeFilter;
-    btn.closest('.wr-filter-group').querySelectorAll('.wr-filter-btn').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
+}
+
+function handleShowOptClick(btn) {
+  var group = btn.dataset.group;
+  var value = btn.dataset.value;
+  if (!group || !value) return;
+  if (group === 'type') filterState.typeFilter = value;
+  else if (group === 'lifecycle') filterState.lifecycleFilter = value;
+  // Update active state within the same section
+  var section = btn.parentElement;
+  if (section) {
+    section.querySelectorAll('.wr-show-opt').forEach(function(o) { o.classList.remove('active'); });
   }
+  btn.classList.add('active');
+  updateShowLabel();
   applyFilters();
+  persistFilterState();
+}
+
+function updateShowLabel() {
+  var label = document.querySelector('#wr-show-btn .wr-show-label');
+  if (!label) return;
+  var lf = filterState.lifecycleFilter, tf = filterState.typeFilter;
+  var lifecycleLabels = { active: 'Active', paused: 'Paused', someday: 'Someday', completed: 'Completed', cancelled: 'Cancelled' };
+  var typeLabels = { project: 'projects', area: 'areas' };
+  if (tf === 'all' && lf === 'all') { label.textContent = 'Show: All'; return; }
+  var parts = [];
+  if (lf !== 'all') parts.push(lifecycleLabels[lf]);
+  if (tf !== 'all') parts.push(typeLabels[tf]);
+  else if (lf !== 'all') parts.push('items');
+  label.textContent = 'Show: ' + parts.join(' ');
+}
+
+function toggleShowPopover() {
+  var pop = document.getElementById('wr-show-popover');
+  if (!pop) return;
+  if (pop.hasAttribute('hidden')) {
+    pop.removeAttribute('hidden');
+    setTimeout(function() {
+      document.addEventListener('click', closeShowPopoverOnOutside);
+    }, 10);
+  } else {
+    pop.setAttribute('hidden', '');
+    document.removeEventListener('click', closeShowPopoverOnOutside);
+  }
+}
+
+function closeShowPopoverOnOutside(e) {
+  if (e.target.closest('#wr-show-popover') || e.target.closest('#wr-show-btn')) return;
+  var pop = document.getElementById('wr-show-popover');
+  if (pop) pop.setAttribute('hidden', '');
+  document.removeEventListener('click', closeShowPopoverOnOutside);
+}
+
+function handleHideDoneToggle() {
+  filterState.hideCompletedTasks = !filterState.hideCompletedTasks;
+  applyHideDoneTasksClass();
+  var btn = document.getElementById('wr-hide-done-btn');
+  if (btn) {
+    btn.classList.toggle('active', filterState.hideCompletedTasks);
+    btn.setAttribute('data-tooltip', filterState.hideCompletedTasks ? 'Show completed tasks' : 'Hide completed tasks');
+    var icon = btn.querySelector('i');
+    if (icon) icon.className = 'fa-regular ' + (filterState.hideCompletedTasks ? 'fa-eye-slash' : 'fa-eye');
+  }
+  persistFilterState();
+}
+
+function applyHideDoneTasksClass() {
+  document.body.classList.toggle('wr-hide-done-tasks', !!filterState.hideCompletedTasks);
 }
 
 function applyFilters() {
@@ -602,17 +687,11 @@ function applyFilters() {
   var sections = document.querySelectorAll('.wr-section');
 
   cards.forEach(function(card) {
-    var statusMatch = true;
-    var typeMatch = true;
-
-    if (activeStatusFilter !== 'all') {
-      statusMatch = card.dataset.status === activeStatusFilter;
-    }
-    if (activeTypeFilter !== 'all') {
-      typeMatch = card.dataset.type === activeTypeFilter;
-    }
-
-    card.style.display = (statusMatch && typeMatch) ? '' : 'none';
+    var ok = true;
+    if (filterState.statusFilter !== 'all' && card.dataset.status !== filterState.statusFilter) ok = false;
+    if (ok && filterState.typeFilter !== 'all' && card.dataset.type !== filterState.typeFilter) ok = false;
+    if (ok && filterState.lifecycleFilter !== 'all' && card.dataset.lifecycle !== filterState.lifecycleFilter) ok = false;
+    card.style.display = ok ? '' : 'none';
   });
 
   sections.forEach(function(section) {
@@ -639,10 +718,34 @@ function showToast(message) {
 // ============================================
 
 function attachAllEventListeners() {
-  // Filter buttons (review status + type)
+  // Review status filter pills
   document.querySelectorAll('.wr-filter-btn').forEach(function(btn) {
     btn.addEventListener('click', function() { handleFilterClick(btn); });
   });
+
+  // Show dropdown button
+  var showBtn = document.getElementById('wr-show-btn');
+  if (showBtn) {
+    showBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleShowPopover();
+    });
+  }
+  document.querySelectorAll('.wr-show-opt').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      handleShowOptClick(btn);
+    });
+  });
+
+  // Hide-completed-tasks toggle
+  var hideBtn = document.getElementById('wr-hide-done-btn');
+  if (hideBtn) {
+    hideBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      handleHideDoneToggle();
+    });
+  }
 
   // Card clicks for expand/collapse
   document.querySelectorAll('.wr-card').forEach(function(card) {
@@ -672,5 +775,7 @@ function attachAllEventListeners() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
+  readInitialFilterState();
   attachAllEventListeners();
+  applyFilters();
 });
