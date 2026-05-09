@@ -73,6 +73,9 @@ function onMessageFromPlugin(type, data) {
     case 'CARD_ARCHIVED':
       handleCardArchived(data);
       break;
+    case 'CARD_META_UPDATED':
+      handleCardMetaUpdated(data);
+      break;
     case 'FULL_REFRESH':
       window.location.reload();
       break;
@@ -86,11 +89,13 @@ function onMessageFromPlugin(type, data) {
 // ============================================
 
 function handleCardClick(e) {
-  // Don't expand if clicking action buttons, links, or inside expanded area
+  // Don't expand if clicking action buttons, links, expanded area, or meta editors
   var target = e.target;
   if (target.closest('.wr-card-actions') ||
       target.closest('.wr-card-expanded') ||
-      target.closest('.wr-task-add')) {
+      target.closest('.wr-task-add') ||
+      target.closest('.wr-meta-editable') ||
+      target.closest('.wr-sched-picker')) {
     return;
   }
 
@@ -137,47 +142,87 @@ function renderExpandedTasks(encodedFilename, sections) {
   var container = document.createElement('div');
   container.className = 'wr-card-expanded';
 
-  // Track last task's line index for add-task positioning
-  var lastTaskLineIndex = -1;
+  // Track last line index across all sections for the bottom-of-note add input
+  var lastLineIndex = -1;
 
   for (var s = 0; s < sections.length; s++) {
     var section = sections[s];
 
-    // Section header
     if (section.heading) {
       var header = document.createElement('div');
       header.className = 'wr-tsec-header';
       header.textContent = section.heading;
       container.appendChild(header);
+      if (section.headingLineIndex > lastLineIndex) lastLineIndex = section.headingLineIndex;
     }
 
-    // Tasks
+    var sectionLastLine = (typeof section.headingLineIndex === 'number') ? section.headingLineIndex : -1;
     for (var t = 0; t < section.tasks.length; t++) {
       var task = section.tasks[t];
       var taskEl = createTaskElement(task, encodedFilename);
       container.appendChild(taskEl);
-      lastTaskLineIndex = task.lineIndex;
+      if (task.lineIndex > sectionLastLine) sectionLastLine = task.lineIndex;
+    }
+    if (sectionLastLine > lastLineIndex) lastLineIndex = sectionLastLine;
+
+    // Per-section add affordance: only render under sections that have a heading,
+    // so the implicit pre-heading section reuses the bottom-of-note input below.
+    if (section.heading) {
+      container.appendChild(createSectionAddRow(encodedFilename, section.heading, sectionLastLine));
     }
   }
 
-  // Add task input
+  // Bottom-of-note add input (always available)
   var addRow = document.createElement('div');
   addRow.className = 'wr-task-add';
-
   var addInput = document.createElement('input');
   addInput.type = 'text';
   addInput.className = 'wr-task-add-input';
-  addInput.placeholder = 'Add a task...';
+  addInput.placeholder = 'Add a task at the end…';
   addInput.dataset.encodedFilename = encodedFilename;
-  addInput.dataset.afterLineIndex = String(lastTaskLineIndex);
+  addInput.dataset.afterLineIndex = String(lastLineIndex);
   addInput.addEventListener('keydown', handleAddTaskKeydown);
   addRow.appendChild(addInput);
   container.appendChild(addRow);
 
   card.appendChild(container);
 
-  // Show or hide archive button based on open task count
   updateArchiveButton(card, sections);
+}
+
+function createSectionAddRow(encodedFilename, heading, afterLineIndex) {
+  var row = document.createElement('div');
+  row.className = 'wr-tsec-add';
+
+  var btn = document.createElement('button');
+  btn.className = 'wr-tsec-add-btn';
+  var icon = document.createElement('i');
+  icon.className = 'fa-solid fa-plus';
+  btn.appendChild(icon);
+  btn.appendChild(document.createTextNode(' Add task'));
+  row.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'wr-tsec-add-input';
+    input.placeholder = 'Add a task to "' + heading + '"…';
+    input.dataset.encodedFilename = encodedFilename;
+    input.dataset.afterLineIndex = String(afterLineIndex);
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Escape') { row.replaceChild(btn, input); return; }
+      handleAddTaskKeydown(ev);
+    });
+    input.addEventListener('blur', function() {
+      // Restore the button if the user dismisses without entering text.
+      if (!input.value.trim() && row.contains(input)) row.replaceChild(btn, input);
+    });
+    row.replaceChild(input, btn);
+    input.focus();
+  });
+
+  return row;
 }
 
 function createTaskElement(task, encodedFilename) {
@@ -430,6 +475,202 @@ function closePickerOnOutsideClick(e) {
   if (!e.target.closest('.wr-sched-picker')) {
     closeAllPickers();
   }
+}
+
+// ============================================
+// CARD META EDITING (review interval + reviewed date)
+// ============================================
+
+function bindMetaEditable(scope) {
+  var root = scope || document;
+  root.querySelectorAll('.wr-meta-editable').forEach(function(el) {
+    if (el.dataset.bound === '1') return;
+    el.dataset.bound = '1';
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var action = el.dataset.action;
+      if (action === 'editInterval') showIntervalPicker(el);
+      else if (action === 'editReviewedDate') showReviewedDatePicker(el);
+    });
+  });
+}
+
+function showIntervalPicker(anchorEl) {
+  closeAllPickers();
+  var card = anchorEl.closest('.wr-card');
+  if (!card) return;
+  var encodedFilename = card.dataset.encodedFilename;
+  var current = (anchorEl.textContent || '').trim();
+
+  var picker = document.createElement('div');
+  picker.className = 'wr-sched-picker';
+  picker.dataset.encodedFilename = encodedFilename;
+  picker.dataset.kind = 'interval';
+
+  var presets = [
+    { label: 'Every day', value: '1d' },
+    { label: 'Every 3 days', value: '3d' },
+    { label: 'Every week', value: '1w' },
+    { label: 'Every 2 weeks', value: '2w' },
+    { label: 'Every month', value: '1m' },
+    { label: 'Every quarter', value: '1q' },
+    { label: 'Every year', value: '1y' },
+  ];
+  presets.forEach(function(opt) {
+    var b = document.createElement('button');
+    b.className = 'wr-sched-opt';
+    b.textContent = opt.label;
+    b.dataset.value = opt.value;
+    b.addEventListener('click', function(e) {
+      e.stopPropagation();
+      sendMessageToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: opt.value });
+      closeAllPickers();
+    });
+    picker.appendChild(b);
+  });
+
+  // Custom interval input (e.g. "10d", "3w", "6m")
+  var customRow = document.createElement('div');
+  customRow.className = 'wr-sched-custom-row';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'wr-sched-custom-input';
+  input.placeholder = 'e.g. 10d, 6w, 3m';
+  customRow.appendChild(input);
+  var setBtn = document.createElement('button');
+  setBtn.className = 'wr-sched-custom-btn';
+  setBtn.textContent = 'Set';
+  function commitCustom() {
+    var v = (input.value || '').trim().toLowerCase();
+    if (!/^\d+[dwmqy]$/.test(v)) { input.style.borderColor = 'var(--wr-red)'; return; }
+    sendMessageToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: v });
+    closeAllPickers();
+  }
+  setBtn.addEventListener('click', function(e) { e.stopPropagation(); commitCustom(); });
+  input.addEventListener('keydown', function(e) {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); commitCustom(); }
+  });
+  customRow.appendChild(setBtn);
+  picker.appendChild(customRow);
+
+  // Clear option (only if a schedule already exists)
+  if (!anchorEl.classList.contains('wr-meta-empty')) {
+    var clearOpt = document.createElement('button');
+    clearOpt.className = 'wr-sched-opt wr-sched-clear danger';
+    clearOpt.textContent = 'Remove schedule';
+    clearOpt.addEventListener('click', function(e) {
+      e.stopPropagation();
+      sendMessageToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: '' });
+      closeAllPickers();
+    });
+    picker.appendChild(clearOpt);
+  }
+
+  document.body.appendChild(picker);
+  positionPickerAt(picker, anchorEl);
+  setTimeout(function() { document.addEventListener('click', closePickerOnOutsideClick); }, 10);
+}
+
+function showReviewedDatePicker(anchorEl) {
+  closeAllPickers();
+  var card = anchorEl.closest('.wr-card');
+  if (!card) return;
+  var encodedFilename = card.dataset.encodedFilename;
+
+  var picker = document.createElement('div');
+  picker.className = 'wr-sched-picker';
+  picker.dataset.encodedFilename = encodedFilename;
+  picker.dataset.kind = 'reviewedDate';
+
+  function send(date) {
+    sendMessageToPlugin('setReviewedDate', { encodedFilename: encodedFilename, date: date });
+    closeAllPickers();
+  }
+
+  var presets = [
+    { label: 'Today', value: todayStr() },
+    { label: 'Yesterday', value: shiftDay(-1) },
+    { label: '3 days ago', value: shiftDay(-3) },
+    { label: 'A week ago', value: shiftDay(-7) },
+  ];
+  presets.forEach(function(opt) {
+    var b = document.createElement('button');
+    b.className = 'wr-sched-opt';
+    b.textContent = opt.label;
+    b.addEventListener('click', function(e) { e.stopPropagation(); send(opt.value); });
+    picker.appendChild(b);
+  });
+
+  var dateInput = document.createElement('input');
+  dateInput.type = 'date';
+  dateInput.className = 'wr-sched-date-input';
+  dateInput.addEventListener('change', function(e) {
+    e.stopPropagation();
+    if (this.value) send(this.value);
+  });
+  picker.appendChild(dateInput);
+
+  if (!anchorEl.classList.contains('wr-meta-empty')) {
+    var clearOpt = document.createElement('button');
+    clearOpt.className = 'wr-sched-opt wr-sched-clear danger';
+    clearOpt.textContent = 'Clear last review date';
+    clearOpt.addEventListener('click', function(e) { e.stopPropagation(); send(''); });
+    picker.appendChild(clearOpt);
+  }
+
+  document.body.appendChild(picker);
+  positionPickerAt(picker, anchorEl);
+  setTimeout(function() { document.addEventListener('click', closePickerOnOutsideClick); }, 10);
+}
+
+function shiftDay(delta) {
+  var d = new Date();
+  d.setDate(d.getDate() + delta);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function positionPickerAt(picker, anchorEl) {
+  var rect = anchorEl.getBoundingClientRect();
+  picker.style.top = (rect.bottom + 4) + 'px';
+  // Keep picker within viewport
+  var width = 220;
+  picker.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + 'px';
+}
+
+function handleCardMetaUpdated(data) {
+  var card = document.querySelector('.wr-card[data-encoded-filename="' + data.encodedFilename + '"]');
+  if (!card) return;
+
+  // Update meta row HTML
+  var meta = card.querySelector('.wr-card-meta');
+  if (meta && data.metaHTML !== undefined) {
+    meta.innerHTML = data.metaHTML;
+    bindMetaEditable(meta);
+  }
+
+  // Update review pill (replace outerHTML so classes refresh too)
+  if (data.pillHTML) {
+    var pill = card.querySelector('.wr-card-top .wr-review-pill');
+    if (pill) {
+      var tmp = document.createElement('div');
+      tmp.innerHTML = data.pillHTML;
+      var newPill = tmp.firstElementChild;
+      if (newPill) pill.replaceWith(newPill);
+    }
+  }
+
+  // Update card status / lifecycle attrs and stripe class
+  if (data.status) {
+    card.dataset.status = data.status;
+    var stripe = card.querySelector('.wr-card-stripe');
+    if (stripe) stripe.className = 'wr-card-stripe ' + data.status;
+  }
+  if (data.lifecycle) card.dataset.lifecycle = data.lifecycle;
+
+  // Re-apply filters in case lifecycle/status now hides the card
+  applyFilters();
+  showToast('Updated');
 }
 
 // ============================================
@@ -771,6 +1012,9 @@ function attachAllEventListeners() {
       if (action) sendMessageToPlugin(action, {});
     });
   });
+
+  // Editable meta items (interval / reviewed date)
+  bindMetaEditable(document);
 }
 
 // Initialize

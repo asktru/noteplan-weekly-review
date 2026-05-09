@@ -547,22 +547,24 @@ function buildReviewPill(project) {
 }
 
 /**
- * Build a single project card
+ * Build the inner HTML of `.wr-card-meta` for a project. Used both during
+ * initial render and in CARD_META_UPDATED refreshes after mutation.
  */
-function buildCard(project) {
-  const encodedFilename = encSafe(project.filename);
-  const isActive = !project.completedDate && !project.cancelledDate && !project.isPaused;
-
+function buildCardMetaHTML(project) {
   let metaLeft = '';
   if (project.folder) {
     metaLeft += `<span class="wr-card-meta-item wr-card-folder"><i class="fa-solid fa-folder"></i> ${esc(project.folder)}</span>`;
   }
   let metaRight = '';
   if (project.reviewInterval) {
-    metaRight += `<span class="wr-card-meta-item"><i class="fa-solid fa-arrows-rotate"></i> ${esc(formatInterval(project.reviewInterval))}</span>`;
+    metaRight += `<span class="wr-card-meta-item wr-meta-editable" data-action="editInterval" data-tooltip="Change review schedule"><i class="fa-solid fa-arrows-rotate"></i> ${esc(formatInterval(project.reviewInterval))}</span>`;
+  } else {
+    metaRight += `<span class="wr-card-meta-item wr-meta-editable wr-meta-empty" data-action="editInterval" data-tooltip="Set review schedule"><i class="fa-solid fa-arrows-rotate"></i> Set schedule</span>`;
   }
   if (project.reviewedDate) {
-    metaRight += `<span class="wr-card-meta-item"><i class="fa-regular fa-calendar-check"></i> ${esc(formatDate(project.reviewedDate))}</span>`;
+    metaRight += `<span class="wr-card-meta-item wr-meta-editable" data-action="editReviewedDate" data-tooltip="Change last review date"><i class="fa-regular fa-calendar-check"></i> ${esc(formatDate(project.reviewedDate))}</span>`;
+  } else if (project.reviewInterval) {
+    metaRight += `<span class="wr-card-meta-item wr-meta-editable wr-meta-empty" data-action="editReviewedDate" data-tooltip="Set last review date"><i class="fa-regular fa-calendar-check"></i> Never reviewed</span>`;
   }
   if (project.startDate) {
     metaRight += `<span class="wr-card-meta-item"><i class="fa-solid fa-play"></i> Started ${esc(formatDate(project.startDate))}</span>`;
@@ -570,7 +572,16 @@ function buildCard(project) {
   if (project.dueDate) {
     metaRight += `<span class="wr-card-meta-item"><i class="fa-solid fa-flag"></i> Due ${esc(formatDate(project.dueDate))}</span>`;
   }
-  const metaItems = metaLeft + (metaRight ? '<span class="wr-card-meta-right">' + metaRight + '</span>' : '');
+  return metaLeft + (metaRight ? '<span class="wr-card-meta-right">' + metaRight + '</span>' : '');
+}
+
+/**
+ * Build a single project card
+ */
+function buildCard(project) {
+  const encodedFilename = encSafe(project.filename);
+  const isActive = project.lifecycleStatus === 'active';
+  const metaItems = buildCardMetaHTML(project);
 
   const actionButtons = isActive
     ? `<button class="wr-card-action-btn review-btn" data-action="markReviewed" data-tooltip="Mark reviewed"><i class="fa-solid fa-check"></i></button>
@@ -967,6 +978,52 @@ body {
 .wr-icon-toggle.active { background: var(--wr-accent-soft); color: var(--wr-accent); border-color: transparent; }
 body.wr-hide-done-tasks .wr-task.is-done,
 body.wr-hide-done-tasks .wr-task.is-cancelled { display: none; }
+.wr-meta-editable {
+  cursor: pointer; padding: 1px 4px; margin: -1px -4px; border-radius: var(--wr-radius-xs);
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.wr-meta-editable:hover { background: var(--wr-border); color: var(--wr-text); }
+.wr-meta-editable.wr-meta-empty { color: var(--wr-text-faint); font-style: italic; }
+.wr-meta-editable.wr-meta-empty:hover { color: var(--wr-accent); font-style: normal; }
+/* Interval picker reuses .wr-sched-picker layout */
+.wr-sched-opt.wr-sched-clear { color: var(--wr-text-muted); border-top: 1px solid var(--wr-border); margin-top: 2px; padding-top: 6px; }
+.wr-sched-opt-active { background: var(--wr-accent-soft); color: var(--wr-accent); font-weight: 600; }
+.wr-sched-custom-row {
+  display: flex; gap: 4px; align-items: center; padding: 4px 6px 2px;
+  border-top: 1px solid var(--wr-border); margin-top: 2px;
+}
+.wr-sched-custom-input {
+  flex: 1; min-width: 0; padding: 4px 6px; font-size: 12px;
+  border: 1px solid var(--wr-border-strong); border-radius: var(--wr-radius-xs);
+  background: var(--wr-bg); color: var(--wr-text); outline: none;
+}
+.wr-sched-custom-input:focus { border-color: var(--wr-accent); }
+.wr-sched-custom-btn {
+  padding: 4px 10px; font-size: 11px; font-weight: 600;
+  border: none; border-radius: var(--wr-radius-xs);
+  background: var(--wr-accent-soft); color: var(--wr-accent);
+  cursor: pointer;
+}
+.wr-sched-custom-btn:hover { background: var(--wr-accent); color: #fff; }
+/* Per-section add-task affordance */
+.wr-tsec-add {
+  display: flex; align-items: center; gap: 6px;
+  margin: 2px 0 6px; padding: 3px 4px;
+}
+.wr-tsec-add-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; font-size: 11px;
+  border: 1px dashed var(--wr-border-strong); border-radius: var(--wr-radius-xs);
+  background: transparent; color: var(--wr-text-faint); cursor: pointer;
+  transition: all 0.1s ease;
+}
+.wr-tsec-add-btn:hover { color: var(--wr-accent); border-color: var(--wr-accent); border-style: solid; }
+.wr-tsec-add-btn i { font-size: 9px; }
+.wr-tsec-add-input {
+  flex: 1; padding: 4px 8px; font-size: 12px;
+  border: 1px solid var(--wr-accent); border-radius: var(--wr-radius-sm);
+  background: var(--wr-bg); color: var(--wr-text); outline: none;
+}
 .wr-body { padding: 16px 16px 40px; }
 .wr-section { margin-bottom: 24px; }
 .wr-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 6px; }
@@ -1315,6 +1372,94 @@ function updateReviewedDate(note) {
   return true;
 }
 
+/**
+ * Set or clear a @mention(value) on the metadata line of a note.
+ * Mirrors the fallback logic from updateReviewedDate.
+ */
+function setOrClearMention(note, mentionKey, value) {
+  const paras = note.paragraphs;
+  if (!paras || paras.length < 2) return false;
+  const pattern = new RegExp(mentionKey.replace('@', '@') + '\\([^)]*\\)');
+
+  let metaLineIdx = -1;
+  for (let i = 1; i < Math.min(paras.length, 10); i++) {
+    if ((paras[i].content || '').match(pattern)) { metaLineIdx = i; break; }
+  }
+  if (metaLineIdx === -1) {
+    for (let i = 1; i < Math.min(paras.length, 10); i++) {
+      if ((paras[i].content || '').includes('@')) { metaLineIdx = i; break; }
+    }
+  }
+  if (metaLineIdx === -1) metaLineIdx = 1;
+
+  const para = paras[metaLineIdx];
+  let content = para.content || '';
+  if (value) {
+    const newMention = `${mentionKey}(${value})`;
+    if (pattern.test(content)) content = content.replace(pattern, newMention);
+    else content = content.trimEnd() + ' ' + newMention;
+  } else {
+    content = content.replace(new RegExp('\\s*' + mentionKey.replace('@', '@') + '\\([^)]*\\)', 'g'), '').trimEnd();
+  }
+  para.content = content;
+  note.updateParagraph(para);
+  return true;
+}
+
+/**
+ * Update the review interval. value=null clears it.
+ */
+function setReviewIntervalForNote(filename, value) {
+  const note = DataStore.projectNoteByFilename(filename);
+  if (!note) return false;
+  const config = getSettings();
+  const fm = parseFrontmatter(note.content || '').frontmatter;
+  const usesFrontmatter = fm.type === 'project' || fm.type === 'area' || fm.review !== undefined;
+
+  if (usesFrontmatter) {
+    if (value) {
+      setFrontmatterKey(note, 'review', value);
+    } else {
+      note.content = removeFrontmatterKey(note.content || '', 'review');
+    }
+  } else {
+    setOrClearMention(note, config.reviewMentionStr, value);
+  }
+  DataStore.updateCache(note, true);
+  return true;
+}
+
+/**
+ * Update the @reviewed date. value=null clears it (i.e., never reviewed).
+ */
+function setReviewedDateForNote(filename, value) {
+  const note = DataStore.projectNoteByFilename(filename);
+  if (!note) return false;
+  const config = getSettings();
+  const fm = parseFrontmatter(note.content || '').frontmatter;
+  const usesFrontmatter = fm.type === 'project' || fm.type === 'area' || fm.reviewed !== undefined || fm.review !== undefined;
+
+  if (usesFrontmatter) {
+    if (value) {
+      setFrontmatterKey(note, 'reviewed', value);
+    } else {
+      note.content = removeFrontmatterKey(note.content || '', 'reviewed');
+    }
+  } else {
+    setOrClearMention(note, config.reviewedMentionStr, value);
+  }
+  DataStore.updateCache(note, true);
+  return true;
+}
+
+/**
+ * Re-scan a single project (by filename) so we can refresh the card after a mutation.
+ */
+function rescanProject(filename) {
+  const all = scanProjects();
+  return all.find(p => p.filename === filename) || null;
+}
+
 // ============================================
 // TASK DATA EXTRACTION
 // ============================================
@@ -1334,7 +1479,10 @@ function getNoteTasks(filename) {
     const p = paras[i];
 
     if (p.type === 'title' && p.headingLevel && p.headingLevel >= 2) {
-      if (currentSection.tasks.length > 0) {
+      // Always push the previous section, even if it has no tasks (so users
+      // can add tasks under an empty heading). Skip the implicit pre-heading
+      // section only when it has no heading and no tasks.
+      if (currentSection.tasks.length > 0 || currentSection.heading) {
         sections.push(currentSection);
       }
       currentSection = {
@@ -1381,7 +1529,7 @@ function getNoteTasks(filename) {
     }
   }
 
-  if (currentSection.tasks.length > 0) {
+  if (currentSection.tasks.length > 0 || currentSection.heading) {
     sections.push(currentSection);
   }
 
@@ -1628,12 +1776,22 @@ async function onMessageFromHTMLView(actionType, data) {
         if (note) {
           const success = updateReviewedDate(note);
           if (success) {
-            // Send update to HTML window to reflect the change
-            sendToHTMLWindow(WINDOW_ID, 'UPDATE_CARD', {
-              encodedFilename: parsedData.encodedFilename,
-              newStatus: 'fresh',
-            });
-            sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: `Reviewed: ${note.title || filename}` });
+            const refreshed = rescanProject(filename);
+            if (refreshed) {
+              await sendToHTMLWindow(WINDOW_ID, 'CARD_META_UPDATED', {
+                encodedFilename: parsedData.encodedFilename,
+                metaHTML: buildCardMetaHTML(refreshed),
+                pillHTML: buildReviewPill(refreshed),
+                status: refreshed.reviewStatus,
+                lifecycle: refreshed.lifecycleStatus,
+              });
+            } else {
+              await sendToHTMLWindow(WINDOW_ID, 'UPDATE_CARD', {
+                encodedFilename: parsedData.encodedFilename,
+                newStatus: 'fresh',
+              });
+            }
+            await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: `Reviewed: ${note.title || filename}` });
           }
         }
         break;
@@ -1660,6 +1818,42 @@ async function onMessageFromHTMLView(actionType, data) {
 
       case 'saveFilters': {
         setFilterPrefs(parsedData);
+        break;
+      }
+
+      case 'setReviewInterval': {
+        const filename = decSafe(parsedData.encodedFilename);
+        const ok = setReviewIntervalForNote(filename, parsedData.interval || null);
+        if (ok) {
+          const refreshed = rescanProject(filename);
+          if (refreshed) {
+            await sendToHTMLWindow(WINDOW_ID, 'CARD_META_UPDATED', {
+              encodedFilename: parsedData.encodedFilename,
+              metaHTML: buildCardMetaHTML(refreshed),
+              pillHTML: buildReviewPill(refreshed),
+              status: refreshed.reviewStatus,
+              lifecycle: refreshed.lifecycleStatus,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'setReviewedDate': {
+        const filename = decSafe(parsedData.encodedFilename);
+        const ok = setReviewedDateForNote(filename, parsedData.date || null);
+        if (ok) {
+          const refreshed = rescanProject(filename);
+          if (refreshed) {
+            await sendToHTMLWindow(WINDOW_ID, 'CARD_META_UPDATED', {
+              encodedFilename: parsedData.encodedFilename,
+              metaHTML: buildCardMetaHTML(refreshed),
+              pillHTML: buildReviewPill(refreshed),
+              status: refreshed.reviewStatus,
+              lifecycle: refreshed.lifecycleStatus,
+            });
+          }
+        }
         break;
       }
 
