@@ -88,6 +88,12 @@
       }
     },
     {
+      "name": "Weekly Review Window",
+      "alias": ["wrw", "weekly review window"],
+      "description": "Open the Weekly Review Dashboard in a separate window",
+      "jsFunction": "showWeeklyReviewWindow"
+    },
+    {
       "name": "onMessageFromHTMLView",
       "description": "Callback for HTML window messages",
       "jsFunction": "onMessageFromHTMLView",

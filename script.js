@@ -7,6 +7,7 @@
 
 var PLUGIN_ID = 'asktru.WeeklyReview';
 var WINDOW_ID = 'asktru.WeeklyReview.dashboard';
+var WINDOW_ID_FLOATING = 'asktru.WeeklyReview.dashboardWindow';
 
 function getSettings() {
   const settings = DataStore.settings || {};
@@ -627,9 +628,16 @@ function getFilterPrefs() {
 }
 
 function setFilterPrefs(prefs) {
+  const p = prefs || {};
+  const sanitized = {
+    statusFilter: p.statusFilter || 'all',
+    typeFilter: p.typeFilter || 'all',
+    lifecycleFilter: p.lifecycleFilter || 'all',
+    hideCompletedTasks: !!p.hideCompletedTasks,
+  };
   try {
     if (typeof DataStore !== 'undefined' && DataStore.setPreference) {
-      DataStore.setPreference('asktru.WeeklyReview.filters', JSON.stringify(prefs || {}));
+      DataStore.setPreference('asktru.WeeklyReview.filters', JSON.stringify(sanitized));
     }
   } catch (e) { console.log('WeeklyReview: setFilterPrefs failed: ' + String(e)); }
 }
@@ -1285,9 +1293,10 @@ ${priCSS('wr-task-pri')}
 /**
  * Build the complete HTML document with all CSS embedded inline
  */
-function buildFullHTML(bodyContent) {
+function buildFullHTML(bodyContent, windowID) {
   const themeCSS = getThemeCSS();
   const pluginCSS = getInlineCSS();
+  const wid = windowID || WINDOW_ID;
 
   // FontAwesome via relative paths to np.Shared (known working pattern)
   const faLinks = `
@@ -1310,6 +1319,7 @@ function buildFullHTML(bodyContent) {
   ${bodyContent}
   <script>
     var receivingPluginID = '${PLUGIN_ID}';
+    var npWindowID = '${wid}';
   </script>
   <script type="text/javascript" src="../np.Shared/pluginToHTMLCommsBridge.js"><\/script>
   <script type="text/javascript" src="weeklyReviewEvents.js"><\/script>
@@ -1683,7 +1693,7 @@ async function showWeeklyReviewDashboard() {
 
     const projects = scanProjects();
     const bodyContent = buildDashboardHTML(projects);
-    const fullHTML = buildFullHTML(bodyContent);
+    const fullHTML = buildFullHTML(bodyContent, WINDOW_ID);
 
     await CommandBar.onMainThread();
     CommandBar.showLoading(false);
@@ -1712,6 +1722,42 @@ async function showWeeklyReviewDashboard() {
   } catch (err) {
     CommandBar.showLoading(false);
     console.log('WeeklyReview error: ' + String(err));
+  }
+}
+
+/**
+ * Open the dashboard in a separate (floating) NotePlan window, alongside the
+ * sidebar embed. Uses a distinct windowID so replies to either view stay
+ * routed to the originating window.
+ */
+async function showWeeklyReviewWindow() {
+  try {
+    CommandBar.showLoading(true, 'Scanning projects...');
+    await CommandBar.onAsyncThread();
+
+    const projects = scanProjects();
+    const bodyContent = buildDashboardHTML(projects);
+    const fullHTML = buildFullHTML(bodyContent, WINDOW_ID_FLOATING);
+
+    await CommandBar.onMainThread();
+    CommandBar.showLoading(false);
+
+    await HTMLView.showWindowWithOptions(fullHTML, 'Weekly Review', {
+      customId: WINDOW_ID_FLOATING,
+      savedFilename: '../../asktru.WeeklyReview/review_dashboard_window.html',
+      shouldFocus: true,
+      reuseUsersWindowRect: true,
+      headerBGColor: 'transparent',
+      autoTopPadding: true,
+      showReloadButton: true,
+      reloadPluginID: PLUGIN_ID,
+      reloadCommandName: 'Weekly Review Window',
+      icon: 'fa-list-check',
+      iconColor: '#7C3AED',
+    });
+  } catch (err) {
+    CommandBar.showLoading(false);
+    console.log('WeeklyReview window error: ' + String(err));
   }
 }
 
@@ -1745,6 +1791,7 @@ async function markCurrentNoteReviewed() {
 async function onMessageFromHTMLView(actionType, data) {
   try {
     const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+    const replyWindowID = (parsedData && parsedData._windowID) || WINDOW_ID;
 
     switch (actionType) {
       case 'markReviewed': {
@@ -1755,7 +1802,7 @@ async function onMessageFromHTMLView(actionType, data) {
           if (success) {
             const refreshed = rescanProject(filename);
             if (refreshed) {
-              await sendToHTMLWindow(WINDOW_ID, 'CARD_META_UPDATED', {
+              await sendToHTMLWindow(replyWindowID, 'CARD_META_UPDATED', {
                 encodedFilename: parsedData.encodedFilename,
                 metaHTML: buildCardMetaHTML(refreshed),
                 pillHTML: buildReviewPill(refreshed),
@@ -1763,12 +1810,12 @@ async function onMessageFromHTMLView(actionType, data) {
                 lifecycle: refreshed.lifecycleStatus,
               });
             } else {
-              await sendToHTMLWindow(WINDOW_ID, 'UPDATE_CARD', {
+              await sendToHTMLWindow(replyWindowID, 'UPDATE_CARD', {
                 encodedFilename: parsedData.encodedFilename,
                 newStatus: 'fresh',
               });
             }
-            await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: `Reviewed: ${note.title || filename}` });
+            await sendToHTMLWindow(replyWindowID, 'SHOW_TOAST', { message: `Reviewed: ${note.title || filename}` });
           }
         }
         break;
@@ -1804,7 +1851,7 @@ async function onMessageFromHTMLView(actionType, data) {
         if (ok) {
           const refreshed = rescanProject(filename);
           if (refreshed) {
-            await sendToHTMLWindow(WINDOW_ID, 'CARD_META_UPDATED', {
+            await sendToHTMLWindow(replyWindowID, 'CARD_META_UPDATED', {
               encodedFilename: parsedData.encodedFilename,
               metaHTML: buildCardMetaHTML(refreshed),
               pillHTML: buildReviewPill(refreshed),
@@ -1829,7 +1876,7 @@ async function onMessageFromHTMLView(actionType, data) {
         const filename = decSafe(parsedData.encodedFilename);
         const taskData = getNoteTasks(filename);
         if (taskData) {
-          await sendToHTMLWindow(WINDOW_ID, 'CARD_TASKS', {
+          await sendToHTMLWindow(replyWindowID, 'CARD_TASKS', {
             encodedFilename: parsedData.encodedFilename,
             sections: taskData.sections,
           });
@@ -1839,15 +1886,13 @@ async function onMessageFromHTMLView(actionType, data) {
 
       case 'toggleTaskComplete': {
         const filename = decSafe(parsedData.encodedFilename);
-        // Save window ID before cross-plugin call (Routine may overwrite globals)
-        const myWindowId = 'asktru.WeeklyReview.dashboard';
         const tcNote = DataStore.projectNoteByFilename(filename);
         const tcPara = tcNote ? tcNote.paragraphs[parsedData.lineIndex] : null;
         const tcHasRepeat = tcPara && (tcPara.content || '').indexOf('@repeat') >= 0;
         const tcWasOpen = tcPara && (tcPara.type === 'open' || tcPara.type === 'checklist');
         const result = toggleTaskComplete(filename, parsedData.lineIndex);
         if (result) {
-          await sendToHTMLWindow(myWindowId, 'TASK_UPDATED', {
+          await sendToHTMLWindow(replyWindowID, 'TASK_UPDATED', {
             encodedFilename: parsedData.encodedFilename,
             lineIndex: result.lineIndex,
             newType: result.newType,
@@ -1859,7 +1904,7 @@ async function onMessageFromHTMLView(actionType, data) {
               // Re-fetch tasks to show the newly created repeat
               const refreshedTasks = getNoteTasks(filename);
               if (refreshedTasks) {
-                await sendToHTMLWindow(myWindowId, 'CARD_TASKS', {
+                await sendToHTMLWindow(replyWindowID, 'CARD_TASKS', {
                   encodedFilename: parsedData.encodedFilename,
                   sections: refreshedTasks.sections,
                 });
@@ -1872,14 +1917,13 @@ async function onMessageFromHTMLView(actionType, data) {
 
       case 'toggleTaskCancel': {
         const filename = decSafe(parsedData.encodedFilename);
-        const myWindowId2 = 'asktru.WeeklyReview.dashboard';
         const cnNote = DataStore.projectNoteByFilename(filename);
         const cnPara = cnNote ? cnNote.paragraphs[parsedData.lineIndex] : null;
         const cnHasRepeat = cnPara && (cnPara.content || '').indexOf('@repeat') >= 0;
         const cnWasOpen = cnPara && (cnPara.type === 'open' || cnPara.type === 'checklist');
         const result = toggleTaskCancel(filename, parsedData.lineIndex);
         if (result) {
-          await sendToHTMLWindow(myWindowId2, 'TASK_UPDATED', {
+          await sendToHTMLWindow(replyWindowID, 'TASK_UPDATED', {
             encodedFilename: parsedData.encodedFilename,
             lineIndex: result.lineIndex,
             newType: result.newType,
@@ -1890,7 +1934,7 @@ async function onMessageFromHTMLView(actionType, data) {
               await DataStore.invokePluginCommandByName('generate repeats', 'asktru.Routine', [filename]);
               const cnRefreshed = getNoteTasks(filename);
               if (cnRefreshed) {
-                await sendToHTMLWindow(myWindowId2, 'CARD_TASKS', {
+                await sendToHTMLWindow(replyWindowID, 'CARD_TASKS', {
                   encodedFilename: parsedData.encodedFilename,
                   sections: cnRefreshed.sections,
                 });
@@ -1905,7 +1949,7 @@ async function onMessageFromHTMLView(actionType, data) {
         const filename = decSafe(parsedData.encodedFilename);
         const result = cycleTaskPriority(filename, parsedData.lineIndex);
         if (result) {
-          await sendToHTMLWindow(WINDOW_ID, 'TASK_PRIORITY_CHANGED', {
+          await sendToHTMLWindow(replyWindowID, 'TASK_PRIORITY_CHANGED', {
             encodedFilename: parsedData.encodedFilename,
             lineIndex: result.lineIndex,
             newPriority: result.newPriority,
@@ -1918,7 +1962,7 @@ async function onMessageFromHTMLView(actionType, data) {
         const filename = decSafe(parsedData.encodedFilename);
         const result = scheduleTask(filename, parsedData.lineIndex, parsedData.dateStr);
         if (result) {
-          await sendToHTMLWindow(WINDOW_ID, 'TASK_SCHEDULED', {
+          await sendToHTMLWindow(replyWindowID, 'TASK_SCHEDULED', {
             encodedFilename: parsedData.encodedFilename,
             lineIndex: result.lineIndex,
             scheduledDate: result.scheduledDate,
@@ -1934,7 +1978,7 @@ async function onMessageFromHTMLView(actionType, data) {
           // Re-fetch all tasks to rebuild the expanded view (reorder changes indices)
           const taskData = getNoteTasks(filename);
           if (taskData) {
-            await sendToHTMLWindow(WINDOW_ID, 'CARD_TASKS', {
+            await sendToHTMLWindow(replyWindowID, 'CARD_TASKS', {
               encodedFilename: parsedData.encodedFilename,
               sections: taskData.sections,
             });
@@ -1950,7 +1994,7 @@ async function onMessageFromHTMLView(actionType, data) {
           // Re-fetch tasks to get updated data with correct line indices
           const taskData = getNoteTasks(filename);
           if (taskData) {
-            await sendToHTMLWindow(WINDOW_ID, 'CARD_TASKS', {
+            await sendToHTMLWindow(replyWindowID, 'CARD_TASKS', {
               encodedFilename: parsedData.encodedFilename,
               sections: taskData.sections,
             });
@@ -1963,13 +2007,13 @@ async function onMessageFromHTMLView(actionType, data) {
         const filename = decSafe(parsedData.encodedFilename);
         const note = DataStore.projectNoteByFilename(filename);
         if (!note) {
-          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Note not found' });
+          await sendToHTMLWindow(replyWindowID, 'SHOW_TOAST', { message: 'Note not found' });
           break;
         }
         // Verify no open tasks remain
         const archTasks = countTasks(note);
         if (archTasks.open > 0) {
-          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Cannot archive: ' + archTasks.open + ' open task(s) remain' });
+          await sendToHTMLWindow(replyWindowID, 'SHOW_TOAST', { message: 'Cannot archive: ' + archTasks.open + ' open task(s) remain' });
           break;
         }
         // Compute archive folder: @Archive/YYYY-MM-DD/{originalFolder}/
@@ -1979,12 +2023,12 @@ async function onMessageFromHTMLView(actionType, data) {
         const archiveFolder = '@Archive/' + today + (originalFolder ? '/' + originalFolder : '');
         const newFilename = DataStore.moveNote(filename, archiveFolder);
         if (newFilename) {
-          await sendToHTMLWindow(WINDOW_ID, 'CARD_ARCHIVED', {
+          await sendToHTMLWindow(replyWindowID, 'CARD_ARCHIVED', {
             encodedFilename: parsedData.encodedFilename,
           });
-          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Archived: ' + (note.title || filename) });
+          await sendToHTMLWindow(replyWindowID, 'SHOW_TOAST', { message: 'Archived: ' + (note.title || filename) });
         } else {
-          await sendToHTMLWindow(WINDOW_ID, 'SHOW_TOAST', { message: 'Failed to archive note' });
+          await sendToHTMLWindow(replyWindowID, 'SHOW_TOAST', { message: 'Failed to archive note' });
         }
         break;
       }
@@ -2122,6 +2166,7 @@ async function turnIntoArea() {
 }
 
 globalThis.showWeeklyReviewDashboard = showWeeklyReviewDashboard;
+globalThis.showWeeklyReviewWindow = showWeeklyReviewWindow;
 globalThis.onMessageFromHTMLView = onMessageFromHTMLView;
 globalThis.markCurrentNoteReviewed = markCurrentNoteReviewed;
 globalThis.refreshDashboard = refreshDashboard;

@@ -3,7 +3,22 @@
    Runs inside the HTML WebView window
    ============================================ */
 
-// receivingPluginID is set in the inline script before the bridge loads
+// receivingPluginID and npWindowID are set in the inline script before the bridge loads.
+// Wrap sendMessageToPlugin so every outgoing payload carries the originating
+// window's ID; the plugin uses it to route replies back to the right window
+// (sidebar embed vs. separate floating window).
+(function() {
+  if (typeof window === 'undefined') return;
+  var orig = window.sendMessageToPlugin;
+  if (typeof orig !== 'function') return;
+  window.sendMessageToPlugin = function(action, data) {
+    var d = data || {};
+    if (typeof npWindowID !== 'undefined' && npWindowID && d._windowID === undefined) {
+      d._windowID = npWindowID;
+    }
+    return orig(action, d);
+  };
+})();
 
 // ============================================
 // DATE HELPERS (client-side)
