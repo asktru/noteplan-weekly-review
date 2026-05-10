@@ -4,21 +4,18 @@
    ============================================ */
 
 // receivingPluginID and npWindowID are set in the inline script before the bridge loads.
-// Wrap sendMessageToPlugin so every outgoing payload carries the originating
-// window's ID; the plugin uses it to route replies back to the right window
-// (sidebar embed vs. separate floating window).
-(function() {
-  if (typeof window === 'undefined') return;
-  var orig = window.sendMessageToPlugin;
-  if (typeof orig !== 'function') return;
-  window.sendMessageToPlugin = function(action, data) {
-    var d = data || {};
-    if (typeof npWindowID !== 'undefined' && npWindowID && d._windowID === undefined) {
-      d._windowID = npWindowID;
-    }
-    return orig(action, d);
-  };
-})();
+// All outgoing messages route through sendToPlugin so each payload carries the
+// originating window's ID; the plugin uses it to route replies back to the
+// right window (sidebar embed vs. separate floating window). The bridge's
+// sendMessageToPlugin is declared with `const`, so it can't be monkey-patched
+// via window — we wrap it with our own helper instead.
+function sendToPlugin(action, data) {
+  var d = data || {};
+  if (typeof npWindowID !== 'undefined' && npWindowID && d._windowID === undefined) {
+    d._windowID = npWindowID;
+  }
+  return sendMessageToPlugin(action, d);
+}
 
 // ============================================
 // DATE HELPERS (client-side)
@@ -138,7 +135,7 @@ function handleCardClick(e) {
     card.appendChild(loading);
 
     var encodedFilename = card.dataset.encodedFilename;
-    sendMessageToPlugin('expandCard', { encodedFilename: encodedFilename });
+    sendToPlugin('expandCard', { encodedFilename: encodedFilename });
   }
 }
 
@@ -264,7 +261,7 @@ function createTaskElement(task, encodedFilename) {
   cb.addEventListener('click', function(e) {
     e.stopPropagation();
     var taskEl = this.closest('.wr-task');
-    sendMessageToPlugin('toggleTaskComplete', {
+    sendToPlugin('toggleTaskComplete', {
       encodedFilename: taskEl.dataset.encodedFilename,
       lineIndex: parseInt(taskEl.dataset.lineIndex, 10),
     });
@@ -279,7 +276,7 @@ function createTaskElement(task, encodedFilename) {
     pri.addEventListener('click', function(e) {
       e.stopPropagation();
       var taskEl = this.closest('.wr-task');
-      sendMessageToPlugin('cycleTaskPriority', {
+      sendToPlugin('cycleTaskPriority', {
         encodedFilename: taskEl.dataset.encodedFilename,
         lineIndex: parseInt(taskEl.dataset.lineIndex, 10),
       });
@@ -324,7 +321,7 @@ function createTaskElement(task, encodedFilename) {
     var priBtn = createActionBtn('fa-solid fa-exclamation', 'Priority', function(e) {
       e.stopPropagation();
       var taskEl = this.closest('.wr-task');
-      sendMessageToPlugin('cycleTaskPriority', {
+      sendToPlugin('cycleTaskPriority', {
         encodedFilename: taskEl.dataset.encodedFilename,
         lineIndex: parseInt(taskEl.dataset.lineIndex, 10),
       });
@@ -345,7 +342,7 @@ function createTaskElement(task, encodedFilename) {
   var upBtn = createActionBtn('fa-solid fa-chevron-up', 'Move up', function(e) {
     e.stopPropagation();
     var taskEl = this.closest('.wr-task');
-    sendMessageToPlugin('moveTask', {
+    sendToPlugin('moveTask', {
       encodedFilename: taskEl.dataset.encodedFilename,
       lineIndex: parseInt(taskEl.dataset.lineIndex, 10),
       direction: 'up',
@@ -357,7 +354,7 @@ function createTaskElement(task, encodedFilename) {
   var downBtn = createActionBtn('fa-solid fa-chevron-down', 'Move down', function(e) {
     e.stopPropagation();
     var taskEl = this.closest('.wr-task');
-    sendMessageToPlugin('moveTask', {
+    sendToPlugin('moveTask', {
       encodedFilename: taskEl.dataset.encodedFilename,
       lineIndex: parseInt(taskEl.dataset.lineIndex, 10),
       direction: 'down',
@@ -370,7 +367,7 @@ function createTaskElement(task, encodedFilename) {
     var cancelBtn = createActionBtn('fa-solid fa-xmark', 'Cancel', function(e) {
       e.stopPropagation();
       var taskEl = this.closest('.wr-task');
-      sendMessageToPlugin('toggleTaskCancel', {
+      sendToPlugin('toggleTaskCancel', {
         encodedFilename: taskEl.dataset.encodedFilename,
         lineIndex: parseInt(taskEl.dataset.lineIndex, 10),
       });
@@ -423,7 +420,7 @@ function showSchedulePicker(anchorEl) {
     opt.addEventListener('click', function(e) {
       e.stopPropagation();
       var pickerEl = this.closest('.wr-sched-picker');
-      sendMessageToPlugin('scheduleTask', {
+      sendToPlugin('scheduleTask', {
         encodedFilename: pickerEl.dataset.encodedFilename,
         lineIndex: parseInt(pickerEl.dataset.lineIndex, 10),
         dateStr: this.dataset.dateValue,
@@ -441,7 +438,7 @@ function showSchedulePicker(anchorEl) {
     e.stopPropagation();
     if (!this.value) return;
     var pickerEl = this.closest('.wr-sched-picker');
-    sendMessageToPlugin('scheduleTask', {
+    sendToPlugin('scheduleTask', {
       encodedFilename: pickerEl.dataset.encodedFilename,
       lineIndex: parseInt(pickerEl.dataset.lineIndex, 10),
       dateStr: this.value,
@@ -457,7 +454,7 @@ function showSchedulePicker(anchorEl) {
   clearOpt.addEventListener('click', function(e) {
     e.stopPropagation();
     var pickerEl = this.closest('.wr-sched-picker');
-    sendMessageToPlugin('scheduleTask', {
+    sendToPlugin('scheduleTask', {
       encodedFilename: pickerEl.dataset.encodedFilename,
       lineIndex: parseInt(pickerEl.dataset.lineIndex, 10),
       dateStr: '',
@@ -536,7 +533,7 @@ function showIntervalPicker(anchorEl) {
     b.dataset.value = opt.value;
     b.addEventListener('click', function(e) {
       e.stopPropagation();
-      sendMessageToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: opt.value });
+      sendToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: opt.value });
       closeAllPickers();
     });
     picker.appendChild(b);
@@ -556,7 +553,7 @@ function showIntervalPicker(anchorEl) {
   function commitCustom() {
     var v = (input.value || '').trim().toLowerCase();
     if (!/^\d+[dwmqy]$/.test(v)) { input.style.borderColor = 'var(--wr-red)'; return; }
-    sendMessageToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: v });
+    sendToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: v });
     closeAllPickers();
   }
   setBtn.addEventListener('click', function(e) { e.stopPropagation(); commitCustom(); });
@@ -574,7 +571,7 @@ function showIntervalPicker(anchorEl) {
     clearOpt.textContent = 'Remove schedule';
     clearOpt.addEventListener('click', function(e) {
       e.stopPropagation();
-      sendMessageToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: '' });
+      sendToPlugin('setReviewInterval', { encodedFilename: encodedFilename, interval: '' });
       closeAllPickers();
     });
     picker.appendChild(clearOpt);
@@ -638,7 +635,7 @@ function handleAddTaskKeydown(e) {
   var text = input.value.trim();
   if (!text) return;
 
-  sendMessageToPlugin('addTask', {
+  sendToPlugin('addTask', {
     encodedFilename: input.dataset.encodedFilename,
     taskText: text,
     afterLineIndex: parseInt(input.dataset.afterLineIndex, 10) || null,
@@ -682,14 +679,14 @@ function handlePriorityChanged(data) {
   // Re-fetch tasks to rebuild (priority affects content and badges)
   var card = document.querySelector('.wr-card[data-encoded-filename="' + data.encodedFilename + '"]');
   if (!card || !card.classList.contains('expanded')) return;
-  sendMessageToPlugin('expandCard', { encodedFilename: data.encodedFilename });
+  sendToPlugin('expandCard', { encodedFilename: data.encodedFilename });
 }
 
 function handleTaskScheduled(data) {
   // Re-fetch tasks to rebuild (schedule badge changes)
   var card = document.querySelector('.wr-card[data-encoded-filename="' + data.encodedFilename + '"]');
   if (!card || !card.classList.contains('expanded')) return;
-  sendMessageToPlugin('expandCard', { encodedFilename: data.encodedFilename });
+  sendToPlugin('expandCard', { encodedFilename: data.encodedFilename });
 }
 
 // ============================================
@@ -759,7 +756,7 @@ function updateArchiveButton(card, sections) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         var c = this.closest('.wr-card');
-        if (c) sendMessageToPlugin('archiveNote', { encodedFilename: c.dataset.encodedFilename });
+        if (c) sendToPlugin('archiveNote', { encodedFilename: c.dataset.encodedFilename });
       });
       actions.appendChild(btn);
     }
@@ -790,7 +787,7 @@ function readInitialFilterState() {
 }
 
 function persistFilterState() {
-  sendMessageToPlugin('saveFilters', {
+  sendToPlugin('saveFilters', {
     statusFilter: filterState.statusFilter,
     typeFilter: filterState.typeFilter,
     lifecycleFilter: filterState.lifecycleFilter,
@@ -955,7 +952,7 @@ function attachAllEventListeners() {
       var action = btn.dataset.action;
       var card = btn.closest('.wr-card');
       if (action && card) {
-        sendMessageToPlugin(action, { encodedFilename: card.dataset.encodedFilename });
+        sendToPlugin(action, { encodedFilename: card.dataset.encodedFilename });
       }
     });
   });
@@ -964,7 +961,7 @@ function attachAllEventListeners() {
   document.querySelectorAll('.wr-header-actions .wr-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var action = btn.dataset.action;
-      if (action) sendMessageToPlugin(action, {});
+      if (action) sendToPlugin(action, {});
     });
   });
 
