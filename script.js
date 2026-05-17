@@ -623,6 +623,7 @@ function getFilterPrefs() {
     statusFilter: p.statusFilter || 'all',
     typeFilter: p.typeFilter || 'all',
     lifecycleFilter: p.lifecycleFilter || 'all',
+    taskFilter: p.taskFilter || 'all',
     hideCompletedTasks: !!p.hideCompletedTasks,
   };
 }
@@ -633,6 +634,7 @@ function setFilterPrefs(prefs) {
     statusFilter: p.statusFilter || 'all',
     typeFilter: p.typeFilter || 'all',
     lifecycleFilter: p.lifecycleFilter || 'all',
+    taskFilter: p.taskFilter || 'all',
     hideCompletedTasks: !!p.hideCompletedTasks,
   };
   try {
@@ -657,33 +659,37 @@ function buildFilterBar(projects) {
 
   const typeCounts = { all: projects.length, project: 0, area: 0 };
   const lifecycleCounts = { all: projects.length, active: 0, paused: 0, someday: 0, completed: 0, cancelled: 0 };
+  const taskCounts = { all: projects.length, open: 0 };
   for (const p of projects) {
     if (typeCounts[p.tagType] !== undefined) typeCounts[p.tagType]++;
     if (lifecycleCounts[p.lifecycleStatus] !== undefined) lifecycleCounts[p.lifecycleStatus]++;
+    if (p.tasks && p.tasks.open > 0) taskCounts.open++;
   }
 
-  const sf = prefs.statusFilter, tf = prefs.typeFilter, lf = prefs.lifecycleFilter;
+  const sf = prefs.statusFilter, tf = prefs.typeFilter, lf = prefs.lifecycleFilter, kf = prefs.taskFilter;
   const cls = (cur, val) => cur === val ? ' active' : '';
 
   // Show button label
   let showLabel;
-  if (tf === 'all' && lf === 'all') showLabel = 'Show: All';
+  if (tf === 'all' && lf === 'all' && kf === 'all') showLabel = 'Show: All';
   else {
     const parts = [];
     if (lf !== 'all') parts.push(LIFECYCLE_LABELS[lf]);
     if (tf !== 'all') parts.push(TYPE_LABELS[tf].toLowerCase());
     else if (lf !== 'all') parts.push('items');
+    if (kf === 'open') parts.push('with open tasks');
     showLabel = 'Show: ' + parts.join(' ');
   }
 
   const showOpt = (group, val, label, count) => {
-    const active = (group === 'type' ? tf : lf) === val;
+    const cur = group === 'type' ? tf : group === 'tasks' ? kf : lf;
+    const active = cur === val;
     const cnt = (count !== undefined && count !== null) ? `<span class="wr-show-count">${count}</span>` : '';
     return `<button class="wr-show-opt${active ? ' active' : ''}" data-group="${group}" data-value="${val}">${label} ${cnt}</button>`;
   };
 
   return `<div class="wr-filter-bar"
-    data-status-filter="${sf}" data-type-filter="${tf}" data-lifecycle-filter="${lf}"
+    data-status-filter="${sf}" data-type-filter="${tf}" data-lifecycle-filter="${lf}" data-task-filter="${kf}"
     data-hide-done-tasks="${prefs.hideCompletedTasks ? '1' : '0'}">
     <div class="wr-filter-group">
       <button class="wr-filter-btn${cls(sf,'all')}" data-filter="all">All <span class="wr-filter-count">${active.length}</span></button>
@@ -713,6 +719,11 @@ function buildFilterBar(projects) {
             ${showOpt('lifecycle', 'someday', 'Someday', lifecycleCounts.someday)}
             ${showOpt('lifecycle', 'completed', 'Completed', lifecycleCounts.completed)}
             ${showOpt('lifecycle', 'cancelled', 'Cancelled', lifecycleCounts.cancelled)}
+          </div>
+          <div class="wr-show-section">
+            <div class="wr-show-title">Tasks</div>
+            ${showOpt('tasks', 'all', 'All', taskCounts.all)}
+            ${showOpt('tasks', 'open', 'Has open tasks', taskCounts.open)}
           </div>
         </div>
       </div>
@@ -1287,6 +1298,78 @@ ${priCSS('wr-task-pri')}
 }
 .wr-task-add-input:focus { border-color: var(--wr-accent); }
 .wr-task-add-input::placeholder { color: var(--wr-text-faint); }
+
+/* ---- Narrow viewports (mobile / small floating window) ---- */
+@media (max-width: 600px) {
+  :root { --wr-pad: 12px; --wr-gap: 8px; }
+
+  /* Filter bar: two rows — tabs scroll horizontally, controls below */
+  .wr-filter-bar { padding: 8px 10px; gap: 8px; flex-wrap: wrap; }
+  .wr-filter-bar > .wr-filter-group:first-child {
+    flex: 1 1 100%; min-width: 0;
+    overflow-x: auto; flex-wrap: nowrap;
+    scrollbar-width: none; -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -10px; padding: 0 10px;
+  }
+  .wr-filter-bar > .wr-filter-group:first-child::-webkit-scrollbar { display: none; }
+  .wr-filter-bar > .wr-filter-right { flex: 1 1 100%; justify-content: flex-start; }
+  .wr-filter-btn { padding: 4px 10px; font-size: 11px; }
+  .wr-filter-count { min-width: 16px; height: 16px; font-size: 9px; }
+
+  /* Show popover: align to viewport edge so it doesn't get cut off */
+  .wr-show-wrap { position: static; }
+  .wr-show-popover {
+    right: 10px; left: 10px; top: auto;
+    margin-top: 6px;
+    max-width: calc(100vw - 20px);
+  }
+  .wr-show-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Body padding */
+  .wr-body { padding: 14px 10px 40px; }
+
+  /* Cards: stripe + body on top row, actions wrap to bottom row */
+  .wr-card {
+    grid-template-columns: 4px 1fr;
+    grid-template-areas: "stripe body" "stripe actions";
+  }
+  .wr-card-stripe { grid-area: stripe; }
+  .wr-card-body { grid-area: body; padding: 10px 12px; }
+  .wr-card-actions {
+    grid-area: actions;
+    flex-direction: row; justify-content: flex-end;
+    border-left: none; border-top: 1px solid var(--wr-border);
+    padding: 4px 6px; gap: 2px;
+  }
+  .wr-card-action-btn { width: 30px; height: 30px; font-size: 12px; }
+  .wr-card-expanded { grid-column: 1 / -1; }
+
+  /* Title row: chevron + title share row 1; tag + pill drop to row 2 */
+  .wr-card-top {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    column-gap: 8px; row-gap: 4px;
+    align-items: center;
+  }
+  .wr-card-top .wr-card-expand-chevron { grid-column: 1; grid-row: 1; }
+  .wr-card-top .wr-card-title {
+    grid-column: 2 / -1; grid-row: 1;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere; word-break: break-word;
+    font-size: 14px; line-height: 1.3;
+  }
+  .wr-card-top .wr-card-tag { grid-column: 1 / span 2; grid-row: 2; justify-self: start; }
+  .wr-card-top .wr-review-pill { grid-column: 3; grid-row: 2; justify-self: end; }
+  .wr-card-meta { flex-wrap: wrap; gap: 6px 10px; }
+  .wr-card-meta-right { margin-left: 0; gap: 8px; }
+  .wr-progress-label { min-width: 0; }
+
+  /* Tooltips: anchor to left so they don't push off-screen on the right */
+  [data-tooltip]:hover::after { right: auto; left: 0; }
+  .wr-card-actions [data-tooltip]:hover::after { right: auto; left: 100%; margin-right: 0; margin-left: 6px; }
+}
 `;
 }
 

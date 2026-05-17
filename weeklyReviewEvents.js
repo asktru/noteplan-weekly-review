@@ -773,6 +773,7 @@ var filterState = {
   statusFilter: 'all',
   typeFilter: 'all',
   lifecycleFilter: 'all',
+  taskFilter: 'all',
   hideCompletedTasks: false,
 };
 
@@ -782,6 +783,7 @@ function readInitialFilterState() {
   filterState.statusFilter = bar.dataset.statusFilter || 'all';
   filterState.typeFilter = bar.dataset.typeFilter || 'all';
   filterState.lifecycleFilter = bar.dataset.lifecycleFilter || 'all';
+  filterState.taskFilter = bar.dataset.taskFilter || 'all';
   filterState.hideCompletedTasks = bar.dataset.hideDoneTasks === '1';
   applyHideDoneTasksClass();
 }
@@ -791,6 +793,7 @@ function persistFilterState() {
     statusFilter: filterState.statusFilter,
     typeFilter: filterState.typeFilter,
     lifecycleFilter: filterState.lifecycleFilter,
+    taskFilter: filterState.taskFilter,
     hideCompletedTasks: filterState.hideCompletedTasks,
   });
 }
@@ -812,6 +815,7 @@ function handleShowOptClick(btn) {
   if (!group || !value) return;
   if (group === 'type') filterState.typeFilter = value;
   else if (group === 'lifecycle') filterState.lifecycleFilter = value;
+  else if (group === 'tasks') filterState.taskFilter = value;
   // Update active state within the same section
   var section = btn.parentElement;
   if (section) {
@@ -826,14 +830,15 @@ function handleShowOptClick(btn) {
 function updateShowLabel() {
   var label = document.querySelector('#wr-show-btn .wr-show-label');
   if (!label) return;
-  var lf = filterState.lifecycleFilter, tf = filterState.typeFilter;
+  var lf = filterState.lifecycleFilter, tf = filterState.typeFilter, kf = filterState.taskFilter;
   var lifecycleLabels = { active: 'Active', paused: 'Paused', someday: 'Someday', completed: 'Completed', cancelled: 'Cancelled' };
   var typeLabels = { project: 'projects', area: 'areas' };
-  if (tf === 'all' && lf === 'all') { label.textContent = 'Show: All'; return; }
+  if (tf === 'all' && lf === 'all' && kf === 'all') { label.textContent = 'Show: All'; return; }
   var parts = [];
   if (lf !== 'all') parts.push(lifecycleLabels[lf]);
   if (tf !== 'all') parts.push(typeLabels[tf]);
   else if (lf !== 'all') parts.push('items');
+  if (kf === 'open') parts.push('with open tasks');
   label.textContent = 'Show: ' + parts.join(' ');
 }
 
@@ -884,6 +889,7 @@ function applyFilters() {
     if (filterState.statusFilter !== 'all' && card.dataset.status !== filterState.statusFilter) ok = false;
     if (ok && filterState.typeFilter !== 'all' && card.dataset.type !== filterState.typeFilter) ok = false;
     if (ok && filterState.lifecycleFilter !== 'all' && card.dataset.lifecycle !== filterState.lifecycleFilter) ok = false;
+    if (ok && filterState.taskFilter === 'open' && (parseInt(card.dataset.openTasks, 10) || 0) <= 0) ok = false;
     card.style.display = ok ? '' : 'none';
   });
 
