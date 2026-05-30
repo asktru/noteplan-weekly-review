@@ -11,12 +11,6 @@
   "plugin.lastUpdateInfo": "Responsive layout for narrow/floating windows (filter bar, dropdown and cards now adapt to small widths) and a new 'Has open tasks' filter to hide projects/areas with no incomplete tasks.",
   "plugin.script": "script.js",
   "plugin.isRemote": "false",
-  "plugin.dependsOn": [
-    {
-      "id": "np.Shared",
-      "minVersion": "1.0.0"
-    }
-  ],
   "plugin.requiredFiles": [
     "weeklyReview.css",
     "weeklyReviewEvents.js"
