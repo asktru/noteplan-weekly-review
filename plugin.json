@@ -123,6 +123,12 @@
       "alias": ["make area", "set area"],
       "description": "Set the current note as an area with frontmatter-based review tracking. Migrates existing hashtag and mention syntax to frontmatter.",
       "jsFunction": "turnIntoArea"
+    },
+    {
+      "name": "onUpdateOrInstall",
+      "description": "Install dependencies after install/update",
+      "jsFunction": "onUpdateOrInstall",
+      "hidden": true
     }
   ]
 }
