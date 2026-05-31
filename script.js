@@ -1790,7 +1790,7 @@ async function showWeeklyReviewDashboard() {
       autoTopPadding: true,
       showReloadButton: true,
       reloadPluginID: PLUGIN_ID,
-      reloadCommandName: 'Weekly Review Dashboard',
+      reloadCommandName: 'Open in sidebar',
       icon: 'fa-list-check',
       iconColor: '#7C3AED',
     };
@@ -1834,7 +1834,7 @@ async function showWeeklyReviewWindow() {
       autoTopPadding: true,
       showReloadButton: true,
       reloadPluginID: PLUGIN_ID,
-      reloadCommandName: 'Weekly Review Window',
+      reloadCommandName: 'Open in separate window',
       icon: 'fa-list-check',
       iconColor: '#7C3AED',
     });

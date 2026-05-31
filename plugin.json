@@ -71,9 +71,9 @@
   ],
   "plugin.commands": [
     {
-      "name": "Weekly Review Dashboard",
+      "name": "Open in sidebar",
       "alias": ["wrd", "weekly review"],
-      "description": "Open the Weekly Review Dashboard",
+      "description": "Open the Weekly Review dashboard in the sidebar",
       "jsFunction": "showWeeklyReviewDashboard",
       "sidebarView": {
         "windowID": "asktru.WeeklyReview.dashboard",
@@ -83,9 +83,9 @@
       }
     },
     {
-      "name": "Weekly Review Window",
+      "name": "Open in separate window",
       "alias": ["wrw", "weekly review window"],
-      "description": "Open the Weekly Review Dashboard in a separate window",
+      "description": "Open the Weekly Review dashboard in a separate window",
       "jsFunction": "showWeeklyReviewWindow"
     },
     {
