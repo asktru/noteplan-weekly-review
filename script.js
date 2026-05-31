@@ -251,6 +251,19 @@ function countTasks(note) {
   return { open, done, cancelled, total };
 }
 
+// Detect project/area type from frontmatter, supporting our `type:` syntax and
+// jgclark.Reviews' `project:` syntax (#project/#goal => project, #area => area).
+// Our `type:` wins when both are present. Returns 'project' | 'area' | ''.
+function detectNoteType(fm) {
+  if (!fm) return '';
+  if (fm.type === 'project' || fm.type === 'area') return fm.type;
+  var pj = fm.project;
+  if (pj != null && String(pj).trim() !== '') {
+    return String(pj).indexOf('#area') >= 0 ? 'area' : 'project';
+  }
+  return '';
+}
+
 /**
  * Determine which tag matched this note (#project or #area)
  */
@@ -284,14 +297,14 @@ function scanProjects() {
     // Check frontmatter first, then fall back to hashtags
     const noteContent = note.content || '';
     const fm = parseFrontmatter(noteContent).frontmatter;
-    const hasFmType = fm.type === 'project' || fm.type === 'area';
+    const fmType = detectNoteType(fm);
 
-    const matchedTag = hasFmType ? (fm.type === 'area' ? '#area' : '#project') : getMatchedTag(note, config.projectTypeTags);
+    const matchedTag = fmType ? (fmType === 'area' ? '#area' : '#project') : getMatchedTag(note, config.projectTypeTags);
     if (!matchedTag) continue;
 
     const mentions = note.mentions || [];
     const hashtags = note.hashtags || [];
-    const useFrontmatter = hasFmType; // prefer frontmatter if type is set there
+    const useFrontmatter = fmType !== ''; // frontmatter mode when matched via type: or project:
 
     // Parse review metadata — frontmatter takes priority over mentions
     const reviewInterval = (useFrontmatter && fm.review) ? fm.review : getMentionValue(mentions, config.reviewMentionStr);
@@ -1425,7 +1438,7 @@ function updateReviewedDate(note) {
 
   // Check if note uses frontmatter
   const fm = parseFrontmatter(note.content || '').frontmatter;
-  if (fm.type === 'project' || fm.type === 'area' || fm.reviewed !== undefined || fm.review !== undefined) {
+  if (detectNoteType(fm) !== '' || fm.reviewed !== undefined || fm.review !== undefined) {
     // Update via frontmatter
     setFrontmatterKey(note, 'reviewed', today);
     DataStore.updateCache(note, true);
@@ -1507,7 +1520,7 @@ function setReviewIntervalForNote(filename, value) {
   if (!note) return false;
   const config = getSettings();
   const fm = parseFrontmatter(note.content || '').frontmatter;
-  const usesFrontmatter = fm.type === 'project' || fm.type === 'area' || fm.review !== undefined;
+  const usesFrontmatter = detectNoteType(fm) !== '' || fm.review !== undefined;
 
   if (usesFrontmatter) {
     if (value) {
