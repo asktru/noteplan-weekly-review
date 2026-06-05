@@ -341,7 +341,7 @@ function scanProjects() {
     if (fm.status) {
       const s = String(fm.status).toLowerCase().trim();
       if (s === 'canceled') lifecycleStatus = 'cancelled';
-      else if (['active', 'paused', 'someday', 'completed', 'cancelled'].includes(s)) lifecycleStatus = s;
+      else if (['active', 'working', 'paused', 'someday', 'completed', 'cancelled'].includes(s)) lifecycleStatus = s;
     }
     if (lifecycleStatus === 'active') {
       if (completedDate) lifecycleStatus = 'completed';
@@ -657,7 +657,7 @@ function setFilterPrefs(prefs) {
   } catch (e) { console.log('WeeklyReview: setFilterPrefs failed: ' + String(e)); }
 }
 
-const LIFECYCLE_LABELS = { active: 'Active', paused: 'Paused', someday: 'Someday', completed: 'Completed', cancelled: 'Cancelled' };
+const LIFECYCLE_LABELS = { active: 'Active', working: 'Working', paused: 'Paused', someday: 'Someday', completed: 'Completed', cancelled: 'Cancelled' };
 const TYPE_LABELS = { project: 'Projects', area: 'Areas' };
 
 /**
@@ -671,7 +671,7 @@ function buildFilterBar(projects) {
   const onTrack = active.filter(p => p.reviewStatus === 'fresh').length;
 
   const typeCounts = { all: projects.length, project: 0, area: 0 };
-  const lifecycleCounts = { all: projects.length, active: 0, paused: 0, someday: 0, completed: 0, cancelled: 0 };
+  const lifecycleCounts = { all: projects.length, active: 0, working: 0, paused: 0, someday: 0, completed: 0, cancelled: 0 };
   const taskCounts = { all: projects.length, open: 0 };
   for (const p of projects) {
     if (typeCounts[p.tagType] !== undefined) typeCounts[p.tagType]++;
@@ -728,6 +728,7 @@ function buildFilterBar(projects) {
             <div class="wr-show-title">Status</div>
             ${showOpt('lifecycle', 'all', 'All', lifecycleCounts.all)}
             ${showOpt('lifecycle', 'active', 'Active', lifecycleCounts.active)}
+            ${showOpt('lifecycle', 'working', 'Working', lifecycleCounts.working)}
             ${showOpt('lifecycle', 'paused', 'Paused', lifecycleCounts.paused)}
             ${showOpt('lifecycle', 'someday', 'Someday', lifecycleCounts.someday)}
             ${showOpt('lifecycle', 'completed', 'Completed', lifecycleCounts.completed)}
