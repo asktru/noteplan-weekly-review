@@ -1759,6 +1759,35 @@ function moveTask(filename, lineIndex, direction) {
   return { oldIndex: lineIndex, newIndex: targetIndex };
 }
 
+// Insert task paragraph(s) above a "## Done" section (created by NotePlan's
+// "Move Completed to Bottom") so incomplete tasks don't land among completed
+// ones. Falls back to appending at the note bottom when there's no Done section.
+// items: array of { content, type }. Returns the line index of the first item.
+function insertTasksAboveDone(note, items) {
+  if (!items || !items.length) return -1;
+  const paras = note.paragraphs || [];
+  let doneIdx = -1;
+  for (let i = 0; i < paras.length; i++) {
+    const p = paras[i];
+    if (p.type === 'title' && p.headingLevel === 2 && (p.content || '').trim() === 'Done') { doneIdx = i; break; }
+  }
+  if (doneIdx < 0) {
+    const startIdx = paras.length;
+    for (let a = 0; a < items.length; a++) note.appendParagraph(items[a].content, items[a].type);
+    return startIdx;
+  }
+  let firstEmpty = doneIdx;
+  while (firstEmpty > 0 && paras[firstEmpty - 1].type === 'empty') firstEmpty--;
+  const hadBlank = firstEmpty < doneIdx;
+  let idx = firstEmpty;
+  for (let b = 0; b < items.length; b++) {
+    note.insertParagraph(items[b].content, idx, items[b].type);
+    idx++;
+  }
+  if (!hadBlank) note.insertParagraph('', idx, 'empty');
+  return firstEmpty;
+}
+
 /**
  * Add a new task to a note
  */
@@ -1766,13 +1795,15 @@ function addTaskToNote(filename, taskText, afterLineIndex) {
   const note = DataStore.projectNoteByFilename(filename);
   if (!note) return null;
 
-  // Insert after the specified line, or at end
-  const insertIndex = (afterLineIndex !== null && afterLineIndex !== undefined)
-    ? afterLineIndex + 1
-    : note.paragraphs.length;
-
-  note.insertParagraph(taskText, insertIndex, 'open');
-  return { lineIndex: insertIndex };
+  // Insert after a specific line (section add) stays as-is; a note-level add
+  // (no afterLineIndex) goes above any ## Done section instead of the bottom.
+  if (afterLineIndex !== null && afterLineIndex !== undefined) {
+    const insertIndex = afterLineIndex + 1;
+    note.insertParagraph(taskText, insertIndex, 'open');
+    return { lineIndex: insertIndex };
+  }
+  const li = insertTasksAboveDone(note, [{ content: taskText, type: 'open' }]);
+  return { lineIndex: li };
 }
 
 // ============================================
