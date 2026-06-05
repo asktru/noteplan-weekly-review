@@ -160,9 +160,12 @@ function renderExpandedTasks(encodedFilename, sections) {
   for (var s = 0; s < sections.length; s++) {
     var section = sections[s];
 
+    var isDoneSection = section.heading === 'Done';
     if (section.heading) {
       var header = document.createElement('div');
-      header.className = 'wr-tsec-header';
+      // The "## Done" heading only ever holds completed tasks, so hide it when
+      // completed tasks are hidden (CSS, see body.wr-hide-done-tasks rule).
+      header.className = 'wr-tsec-header' + (isDoneSection ? ' wr-tsec-header-done' : '');
       header.textContent = section.heading;
       container.appendChild(header);
       if (section.headingLineIndex > lastLineIndex) lastLineIndex = section.headingLineIndex;
@@ -177,9 +180,10 @@ function renderExpandedTasks(encodedFilename, sections) {
     }
     if (sectionLastLine > lastLineIndex) lastLineIndex = sectionLastLine;
 
-    // Per-section add affordance: only render under sections that have a heading,
-    // so the implicit pre-heading section reuses the bottom-of-note input below.
-    if (section.heading) {
+    // Per-section add affordance: only under sections that have a heading (the
+    // implicit pre-heading section reuses the bottom-of-note input below). Skip
+    // the "## Done" section — incomplete tasks should never be added there.
+    if (section.heading && !isDoneSection) {
       container.appendChild(createSectionAddRow(encodedFilename, section.heading, sectionLastLine));
     }
   }
@@ -192,7 +196,8 @@ function renderExpandedTasks(encodedFilename, sections) {
   addInput.className = 'wr-task-add-input';
   addInput.placeholder = 'Add a task at the end…';
   addInput.dataset.encodedFilename = encodedFilename;
-  addInput.dataset.afterLineIndex = String(lastLineIndex);
+  // No afterLineIndex → addTaskToNote routes through insertTasksAboveDone, so
+  // the task lands above any "## Done" section rather than at the very bottom.
   addInput.addEventListener('keydown', handleAddTaskKeydown);
   addRow.appendChild(addInput);
   container.appendChild(addRow);

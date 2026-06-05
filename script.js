@@ -1010,6 +1010,9 @@ body {
 .wr-icon-toggle.active { background: var(--wr-accent-soft); color: var(--wr-accent); border-color: transparent; }
 body.wr-hide-done-tasks .wr-task.is-done,
 body.wr-hide-done-tasks .wr-task.is-cancelled { display: none; }
+/* The "## Done" section only holds completed tasks; hide its heading too when
+   completed tasks are hidden, so it isn't left as an empty heading. */
+body.wr-hide-done-tasks .wr-tsec-header-done { display: none; }
 .wr-meta-editable {
   cursor: pointer; padding: 1px 4px; margin: -1px -4px; border-radius: var(--wr-radius-xs);
   transition: background 0.1s ease, color 0.1s ease;
