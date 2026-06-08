@@ -8,7 +8,7 @@ A project and area review dashboard for [NotePlan](https://noteplan.co), inspire
 
 - **Review scheduling** — each project/area has a review interval and a last-review date; the dashboard groups items by Needs Review, Review Soon, On Track, No Schedule, and Inactive
 - **Inline editing** — click `Every 1 week` on any card to change the interval (presets + custom values like `10d`, `6w`); mark items reviewed in one click
-- **Tasks at a glance** — expand any card to see its tasks grouped by heading. Toggle done/cancelled, set priority, schedule, reorder, and add new tasks at the end of any section
+- **Tasks at a glance** — expand any card to see its tasks grouped by heading. Toggle done/cancelled, set priority, schedule, reorder, add new tasks at the end of any section, and move completed tasks to a `## Done` section at the bottom
 - **Persistent filters** — the filter bar remembers your last selection: review status (pills) plus a Show dropdown grouping by type (project/area) and lifecycle status (active/paused/someday/completed/cancelled), and a toggle to hide completed tasks
 - **Auto-archive** — when a card has no open tasks, an archive button appears that moves the note to `@Archive/YYYY-MM-DD/<original folder>/`
 - **Theme-aware** — adapts to NotePlan's current light/dark theme and tint colour
@@ -24,7 +24,7 @@ The plugin scans every project note in your vault (excluding the folders configu
   type: project        # or: area
   review: 1w           # interval — d/w/m/q/y
   reviewed: 2026-04-25 # last review date (optional)
-  status: active       # active | paused | someday | completed | canceled
+  status: active       # active | working | paused | someday | completed | canceled
   start: 2026-01-01    # optional
   due: 2026-06-30      # optional
   ---
@@ -47,7 +47,8 @@ A project becomes **overdue** the day it's due, **review soon** within 2 days, a
 
 | Command | Description |
 |---|---|
-| `Weekly Review Dashboard` (alias `wrd`) | Opens the dashboard in the sidebar |
+| `Open in sidebar` (alias `wrd`, `weekly review`) | Opens the dashboard in the sidebar |
+| `Open in separate window` (alias `wrw`) | Opens the dashboard in a floating window |
 | `Mark as Reviewed` (alias `review done`) | Marks the currently open note as reviewed today |
 | `Turn into project` (alias `make project`) | Adds `type: project` frontmatter to the current note and migrates any inline `@review`/`@reviewed` to frontmatter |
 | `Turn into area` (alias `make area`) | Same as above, for areas |

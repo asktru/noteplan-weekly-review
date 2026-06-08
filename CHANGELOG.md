@@ -1,5 +1,19 @@
 # What's changed in 🔭 Weekly Review plugin?
 
+## [1.4.0] 2026-06-07
+### New
+- **Move completed to bottom**: card action that moves completed/cancelled top-level tasks (with their nested content) under a `## Done` heading at the end of the note.
+- **Working** project status option.
+- jgclark `project:` frontmatter is recognised for project/area detection.
+- np.Shared is auto-installed on install/update.
+
+### Changes
+- View commands renamed to the shared **Open in sidebar** (alias `wrd`) / **Open in separate window** (alias `wrw`) convention.
+- Note-level added tasks insert above the `## Done` section.
+
+### Fixes
+- End-of-note "Add task" no longer lands inside the Done section, and an empty `## Done` heading is hidden.
+
 ## [1.3.0] 2026-05-17
 ### New
 - **Responsive layout**: filter bar, Show dropdown, and cards reflow gracefully in narrow or floating windows.

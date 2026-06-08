@@ -7,8 +7,8 @@
   "plugin.description": "A beautiful dashboard for reviewing your projects and areas on a schedule.",
   "plugin.icon": "🔄",
   "plugin.author": "asktru",
-  "plugin.version": "1.3.0",
-  "plugin.lastUpdateInfo": "Responsive layout for narrow/floating windows (filter bar, dropdown and cards now adapt to small widths) and a new 'Has open tasks' filter to hide projects/areas with no incomplete tasks.",
+  "plugin.version": "1.4.0",
+  "plugin.lastUpdateInfo": "New 'Move completed to bottom' card action, a 'Working' status option, renamed Open-in-sidebar / Open-in-separate-window commands, and Done-section placement fixes for added tasks.",
   "plugin.script": "script.js",
   "plugin.isRemote": "false",
   "plugin.requiredFiles": [
