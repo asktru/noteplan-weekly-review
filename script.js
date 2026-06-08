@@ -597,10 +597,16 @@ function buildCard(project) {
   const isActive = project.lifecycleStatus === 'active';
   const metaItems = buildCardMetaHTML(project);
 
+  const hasCompleted = (project.tasks.done > 0) || (project.tasks.cancelled > 0);
+  const moveBtn = hasCompleted
+    ? `<button class="wr-card-action-btn" data-action="moveCompletedToBottom" data-tooltip="Move completed to bottom"><i class="fa-solid fa-arrow-down-to-line"></i></button>`
+    : '';
   const actionButtons = isActive
     ? `<button class="wr-card-action-btn review-btn" data-action="markReviewed" data-tooltip="Mark reviewed"><i class="fa-solid fa-check"></i></button>
+       ${moveBtn}
        <button class="wr-card-action-btn open-btn" data-action="openNote" data-tooltip="Open note"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
-    : `<button class="wr-card-action-btn open-btn" data-action="openNote" data-tooltip="Open note"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
+    : `${moveBtn}
+       <button class="wr-card-action-btn open-btn" data-action="openNote" data-tooltip="Open note"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
 
   return `<div class="wr-card" data-encoded-filename="${encodedFilename}" data-status="${project.reviewStatus}" data-type="${project.tagType}" data-lifecycle="${project.lifecycleStatus}" data-open-tasks="${project.tasks.open}">
     <div class="wr-card-stripe ${project.reviewStatus}"></div>
@@ -1792,6 +1798,55 @@ function insertTasksAboveDone(note, items) {
   return firstEmpty;
 }
 
+// Move all completed/cancelled TOP-LEVEL tasks & checklists (with their nested
+// content) to the end of the note under a "## Done" heading (created if absent).
+// Items already under "## Done" stay put; no-op if there's nothing to move.
+function moveCompletedToBottom(note) {
+  var paras = note.paragraphs || [];
+  if (!paras.length) return;
+  function indentOf(p) {
+    var ind = p.indentLevel || 0;
+    if (ind === 0 && p.rawContent) { var m = p.rawContent.match(/^\t+/); if (m) ind = m[0].length; }
+    return ind;
+  }
+  var doneLine = -1;
+  for (var i = 0; i < paras.length; i++) {
+    if (paras[i].type === 'title' && paras[i].headingLevel === 2 && (paras[i].content || '').trim() === 'Done') { doneLine = paras[i].lineIndex; break; }
+  }
+  var DONE_TYPES = { done: 1, cancelled: 1, checklistDone: 1, checklistCancelled: 1 };
+  var ranges = [];
+  for (var j = 0; j < paras.length; j++) {
+    var p = paras[j];
+    if (indentOf(p) !== 0 || !DONE_TYPES[p.type]) continue;
+    if (doneLine >= 0 && p.lineIndex > doneLine) continue; // already under ## Done
+    var endLine = p.lineIndex;
+    for (var k = j + 1; k < paras.length; k++) {
+      if (indentOf(paras[k]) > 0) endLine = paras[k].lineIndex;
+      else break;
+    }
+    ranges.push({ start: p.lineIndex, end: endLine });
+  }
+  if (!ranges.length) return;
+
+  var lines = (note.content || '').split('\n');
+  var moved = [];
+  var remove = {};
+  for (var r = 0; r < ranges.length; r++) {
+    for (var ln = ranges[r].start; ln <= ranges[r].end; ln++) { moved.push(lines[ln]); remove[ln] = true; }
+  }
+  var remaining = [];
+  for (var li = 0; li < lines.length; li++) { if (!remove[li]) remaining.push(lines[li]); }
+  while (remaining.length && remaining[remaining.length - 1].trim() === '') remaining.pop();
+
+  var hasDone = false;
+  for (var di = 0; di < remaining.length; di++) { if (/^##\s+Done\s*$/.test(remaining[di])) { hasDone = true; break; } }
+  var tail = hasDone ? [] : ['', '## Done'];
+  tail = tail.concat(moved);
+
+  note.content = remaining.concat(tail).join('\n');
+  DataStore.updateCache(note, true);
+}
+
 /**
  * Add a new task to a note
  */
@@ -2010,6 +2065,28 @@ async function onMessageFromHTMLView(actionType, data) {
           await sendToHTMLWindow(replyWindowID, 'CARD_TASKS', {
             encodedFilename: parsedData.encodedFilename,
             sections: taskData.sections,
+          });
+        }
+        break;
+      }
+
+      case 'moveCompletedToBottom': {
+        const filename = decSafe(parsedData.encodedFilename);
+        const mcNote = DataStore.projectNoteByFilename(filename);
+        if (!mcNote) break;
+        moveCompletedToBottom(mcNote);
+        const mcTasks = getNoteTasks(filename);
+        if (mcTasks) {
+          await sendToHTMLWindow(replyWindowID, 'CARD_TASKS', {
+            encodedFilename: parsedData.encodedFilename,
+            sections: mcTasks.sections,
+          });
+        }
+        const mcRefreshed = rescanProject(filename);
+        if (mcRefreshed) {
+          await sendToHTMLWindow(replyWindowID, 'CARD_META_UPDATED', {
+            encodedFilename: parsedData.encodedFilename,
+            metaHTML: buildCardMetaHTML(mcRefreshed),
           });
         }
         break;
