@@ -7,8 +7,8 @@
   "plugin.description": "A beautiful dashboard for reviewing your projects and areas on a schedule.",
   "plugin.icon": "🔄",
   "plugin.author": "asktru",
-  "plugin.version": "1.4.0",
-  "plugin.lastUpdateInfo": "New 'Move completed to bottom' card action, a 'Working' status option, renamed Open-in-sidebar / Open-in-separate-window commands, and Done-section placement fixes for added tasks.",
+  "plugin.version": "1.4.1",
+  "plugin.lastUpdateInfo": "Support for NotePlan's Apple Reminders links: @remind(...) tags are hidden instead of shown as raw text.",
   "plugin.script": "script.js",
   "plugin.isRemote": "false",
   "plugin.requiredFiles": [

@@ -1557,6 +1557,9 @@ function rescanProject(filename) {
 // TASK DATA EXTRACTION
 // ============================================
 
+// NotePlan Apple Reminders link: @remind, @remind(args) or linked @remind(args:::reminderId)
+const REMIND_RE = /\s*@remind(?:\([^()]*\)|(?![\w(]))/g;
+
 /**
  * Extract structured task data from a note, grouped by heading sections
  */
@@ -1607,6 +1610,7 @@ function getNoteTasks(filename) {
       display = display.replace(/\s*>today/g, '');
       display = display.replace(/\s*@done\([^)]*\)/g, '');
       display = display.replace(/\s*@repeat\([^)]*\)/g, '');
+      display = display.replace(REMIND_RE, '');
 
       currentSection.tasks.push({
         lineIndex: i,

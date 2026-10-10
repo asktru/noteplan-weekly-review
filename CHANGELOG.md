@@ -1,5 +1,9 @@
 # What's changed in 🔭 Weekly Review plugin?
 
+## [1.4.1] 2026-10-10
+### Fixes
+- `@remind(...)` tags (NotePlan's Apple Reminders link) are hidden in project task lists instead of shown as a mention.
+
 ## [1.4.0] 2026-06-07
 ### New
 - **Move completed to bottom**: card action that moves completed/cancelled top-level tasks (with their nested content) under a `## Done` heading at the end of the note.
