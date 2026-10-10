@@ -7,12 +7,11 @@
   "plugin.description": "A beautiful dashboard for reviewing your projects and areas on a schedule.",
   "plugin.icon": "🔄",
   "plugin.author": "asktru",
-  "plugin.version": "1.4.1",
-  "plugin.lastUpdateInfo": "Support for NotePlan's Apple Reminders links: @remind(...) tags are hidden instead of shown as raw text.",
+  "plugin.version": "1.4.2",
+  "plugin.lastUpdateInfo": "Fixes the date picker on iPad, which closed by itself and scheduled the task for today.",
   "plugin.script": "script.js",
   "plugin.isRemote": "false",
   "plugin.requiredFiles": [
-    "weeklyReview.css",
     "weeklyReviewEvents.js"
   ],
   "plugin.requiredSharedFiles": [

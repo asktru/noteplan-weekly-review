@@ -250,6 +250,7 @@ function createTaskElement(task, encodedFilename) {
   if (task.type === 'cancelled') el.className += ' is-cancelled';
   el.dataset.lineIndex = String(task.lineIndex);
   el.dataset.encodedFilename = encodedFilename;
+  if (task.scheduledDate) el.dataset.scheduledDate = task.scheduledDate;
 
   // Checkbox
   var cb = document.createElement('span');
@@ -439,6 +440,10 @@ function showSchedulePicker(anchorEl) {
   var dateInput = document.createElement('input');
   dateInput.type = 'date';
   dateInput.className = 'wr-sched-date-input';
+  // Start from a real date: on iPad an empty date input auto-fills today and
+  // fires 'change' about a second after the calendar opens, which scheduled
+  // the task for today and closed the picker before a date could be chosen.
+  dateInput.value = taskEl.dataset.scheduledDate || todayStr();
   dateInput.addEventListener('change', function(e) {
     e.stopPropagation();
     if (!this.value) return;

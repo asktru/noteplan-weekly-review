@@ -1,5 +1,10 @@
 # What's changed in 🔭 Weekly Review plugin?
 
+## [1.4.2] 2026-10-10
+### Fixes
+- On iPad, the schedule picker's calendar no longer closes about a second after opening (and no longer schedules the task for today on its own). The date field now starts on the task's current date, or today.
+- Removed a stale `weeklyReview.css` entry from the plugin's required files; the file never existed.
+
 ## [1.4.1] 2026-10-10
 ### Fixes
 - `@remind(...)` tags (NotePlan's Apple Reminders link) are hidden in project task lists instead of shown as a mention.
